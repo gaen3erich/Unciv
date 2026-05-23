@@ -1,0 +1,20 @@
+{
+  "schema": "llm-agent-config/v1",
+  "name": "openrouter-llama-3.3-stress",
+  "description": "Example OpenAI-compatible config for OpenRouter. Verify model availability before running.",
+  "client": {
+    "kind": "openai-compat",
+    "apiKeyEnv": "OPENROUTER_API_KEY",
+    "model": "meta-llama/llama-3.3-70b-instruct",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "timeoutSeconds": 120,
+    "maxRetries": 2,
+    "extraHeaders": {
+      "HTTP-Referer": "https://github.com/yairm210/Unciv",
+      "X-Title": "Unciv LLM Gateway"
+    }
+  },
+  "request": { "temperature": 0.0, "maxTokens": 4096 },
+  "policy": { "kind": "llm", "fallback": "end_turn_only", "failOnLlmErrorAfterConsecutive": 5 },
+  "trace": { "includePrompts": false, "includeRationale": true }
+}

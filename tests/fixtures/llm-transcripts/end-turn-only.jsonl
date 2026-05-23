@@ -1,0 +1,2 @@
+{"rawText":"","toolCallJson":"{\"actions\":[{\"kind\":\"EndTurn\",\"id\":\"end_turn\"}],\"rationale\":\"End the turn to smoke-test the fake LLM path.\"}","stopReason":"tool_use","usageInputTokens":10,"usageOutputTokens":5,"usageCacheReadTokens":0,"latencyMs":1}
+{"rawText":"","toolCallJson":"{\"actions\":[{\"kind\":\"EndTurn\",\"id\":\"end_turn\"}],\"rationale\":\"End the turn to smoke-test the fake LLM path.\"}","stopReason":"tool_use","usageInputTokens":10,"usageOutputTokens":5,"usageCacheReadTokens":0,"latencyMs":1}

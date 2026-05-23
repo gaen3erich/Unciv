@@ -1,0 +1,16 @@
+{
+  "schema": "llm-agent-config/v1",
+  "name": "ollama-local",
+  "description": "Example local Ollama config using its OpenAI-compatible endpoint.",
+  "client": {
+    "kind": "openai-compat",
+    "apiKeyEnv": "OLLAMA_API_KEY",
+    "model": "llama3.3",
+    "baseUrl": "http://localhost:11434/v1",
+    "timeoutSeconds": 300,
+    "maxRetries": 1
+  },
+  "request": { "temperature": 0.0, "maxTokens": 4096 },
+  "policy": { "kind": "llm", "fallback": "end_turn_only", "failOnLlmErrorAfterConsecutive": 5 },
+  "trace": { "includePrompts": false, "includeRationale": true }
+}
