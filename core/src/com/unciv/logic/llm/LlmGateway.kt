@@ -16,6 +16,7 @@ class LlmGateway(
         val legalActionsById = observation.legalActions.associateBy { it.id }
         val appliedActions = ArrayList<LlmLegalAction>()
         val rejectedActions = ArrayList<LlmRejectedAction>()
+        applier.beginStep()
 
         for (selectedAction in selectedActions) {
             if (gameInfo.gameParameters.isOnlineMultiplayer && !allowOnlineMultiplayer) {

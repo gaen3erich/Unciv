@@ -98,6 +98,43 @@ class LlmJsonCodec {
             field("constructionName", action.constructionName),
             rawField("addToTop", action.addToTop.toString())
         )
+        is LlmLegalAction.RunUnitAutomation -> obj(
+            field("kind", "RunUnitAutomation"),
+            field("id", action.id)
+        )
+        is LlmLegalAction.AttackCity -> obj(
+            field("kind", "AttackCity"),
+            field("id", action.id),
+            field("targetCivId", action.targetCivId),
+            field("targetCityId", action.targetCityId),
+            field("targetCityName", action.targetCityName),
+            rawField("location", encodeHexCoord(action.location))
+        )
+        is LlmLegalAction.DefendCity -> obj(
+            field("kind", "DefendCity"),
+            field("id", action.id),
+            field("cityId", action.cityId),
+            field("cityName", action.cityName)
+        )
+        is LlmLegalAction.DeclareWar -> obj(
+            field("kind", "DeclareWar"),
+            field("id", action.id),
+            field("targetCivId", action.targetCivId),
+            field("targetCivName", action.targetCivName)
+        )
+        is LlmLegalAction.OfferPeace -> obj(
+            field("kind", "OfferPeace"),
+            field("id", action.id),
+            field("targetCivId", action.targetCivId),
+            field("targetCivName", action.targetCivName)
+        )
+        is LlmLegalAction.FoundCity -> obj(
+            field("kind", "FoundCity"),
+            field("id", action.id),
+            rawField("unitId", action.unitId.toString()),
+            field("unitName", action.unitName),
+            rawField("location", encodeHexCoord(action.location))
+        )
         is LlmLegalAction.EndTurn -> obj(
             field("kind", "EndTurn"),
             field("id", action.id)

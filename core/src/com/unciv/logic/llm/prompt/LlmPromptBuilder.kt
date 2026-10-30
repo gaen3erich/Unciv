@@ -51,6 +51,12 @@ class LlmPromptBuilder(
     private fun describe(action: LlmLegalAction): String = when (action) {
         is LlmLegalAction.ChooseTechnology -> "research ${action.techName}"
         is LlmLegalAction.ChooseCityConstruction -> "build ${action.constructionName} in ${action.cityName}"
+        is LlmLegalAction.RunUnitAutomation -> "let the built-in automation move all units that got no order yet"
+        is LlmLegalAction.AttackCity -> "send the army to attack ${action.targetCityName} at (${action.location.x},${action.location.y})"
+        is LlmLegalAction.DefendCity -> "send the army to defend ${action.cityName}"
+        is LlmLegalAction.DeclareWar -> "declare war on ${action.targetCivName}"
+        is LlmLegalAction.OfferPeace -> "offer peace to ${action.targetCivName} (they answer on their turn)"
+        is LlmLegalAction.FoundCity -> "move ${action.unitName} #${action.unitId} to (${action.location.x},${action.location.y}) and found a city there"
         is LlmLegalAction.EndTurn -> "finish this turn"
     }
 
@@ -59,10 +65,15 @@ class LlmPromptBuilder(
             "You play one civilization in Unciv as a strategic agent. " +
                 "You receive the current game observation as JSON. " +
                 "You MUST respond with a single pick_actions tool call. " +
-                "Pick zero or more legal actions by exact id. Choose end_turn to advance the game."
+                "Pick zero or more legal actions by exact id; they are applied in the order given. " +
+                "Units are commanded in groups, not one by one, and each unit follows only the first order " +
+                "that covers it this turn: found_city moves one settler, attack_city and defend_city move " +
+                "the whole remaining army, run_units hands every remaining unit to the built-in automation. " +
+                "Units that get no order stay idle, so include run_units every turn before end_turn. " +
+                "Choose end_turn to advance the game."
 
         val toolSchema: String = """
-            {"name":"pick_actions","description":"Apply zero or more legal actions to the current game state.","input_schema":{"type":"object","properties":{"actions":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"kind":{"const":"ChooseTechnology"},"id":{"type":"string"},"techName":{"type":"string"},"path":{"type":"array","items":{"type":"string"}}},"required":["kind","id","techName"]},{"type":"object","properties":{"kind":{"const":"ChooseCityConstruction"},"id":{"type":"string"},"cityId":{"type":"string"},"cityName":{"type":"string"},"constructionName":{"type":"string"},"addToTop":{"type":"boolean"}},"required":["kind","id","cityId","cityName","constructionName"]},{"type":"object","properties":{"kind":{"const":"EndTurn"},"id":{"const":"end_turn"}},"required":["kind","id"]}]}},"rationale":{"type":"string"}},"required":["actions"]}}
+            {"name":"pick_actions","description":"Apply zero or more legal actions to the current game state, in order.","input_schema":{"type":"object","properties":{"actions":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string","description":"Exact id of a legal action"},"kind":{"type":"string"}},"required":["id"]}},"rationale":{"type":"string"}},"required":["actions"]}}
         """.trimIndent()
     }
 }
