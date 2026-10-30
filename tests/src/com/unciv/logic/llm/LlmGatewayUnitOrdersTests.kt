@@ -117,10 +117,19 @@ class LlmGatewayUnitOrdersTests {
         val ourCity = fixture.firstCiv.cities.single()
         val defendId = LlmActionCollector.defendCityId(LlmActionCollector.cityIdFor(fixture.firstCiv, ourCity))
 
-        val result = step(fixture, defendId, LlmLegalAction.RUN_UNITS_ID)
+        val legal = LlmActionCollector().buildObservation(fixture.gameInfo, fixture.firstCiv).legalActions
+        val actions = listOf(defendId, LlmLegalAction.RUN_UNITS_ID).map { id -> legal.single { it.id == id } }
+        // ScriptedPolicy hands out one action per step, so defend and run_units take two steps
+        val gateway = LlmGateway(ScriptedPolicy(actions))
 
-        assertTrue(result.rejectedActions.isEmpty())
-        assertEquals(2, result.appliedActions.size)
+        val defendResult = gateway.step(fixture.gameInfo, fixture.firstCiv)
+        assertTrue(defendResult.rejectedActions.isEmpty())
+        assertEquals(1, defendResult.appliedActions.size)
+        assertEquals(ourCity.getCenterTile(), warrior.getTile())
+
+        val runResult = gateway.step(fixture.gameInfo, fixture.firstCiv)
+        assertTrue(runResult.rejectedActions.isEmpty())
+        assertEquals(1, runResult.appliedActions.size)
         assertEquals(ourCity.getCenterTile(), warrior.getTile())
     }
 
