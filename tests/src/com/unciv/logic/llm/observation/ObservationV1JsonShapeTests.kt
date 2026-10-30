@@ -49,7 +49,11 @@ class ObservationV1JsonShapeTests {
     fun `legal action kinds are closed set`() {
         val observation = LlmActionCollector().buildObservation(LlmGatewayTestFixtures.gameWithFoundedCity().gameInfo)
         val json = JsonReader().parse(LlmJsonCodec().encodeObservation(observation))
-        val allowedKinds = setOf("ChooseTechnology", "ChooseCityConstruction", "EndTurn")
+        val allowedKinds = setOf(
+            "ChooseTechnology", "ChooseCityConstruction",
+            "RunUnitAutomation", "AttackCity", "DefendCity", "DeclareWar", "OfferPeace", "FoundCity",
+            "EndTurn"
+        )
 
         for (action in json.get("legalActions")) {
             assertTrue(allowedKinds.contains(action.getString("kind")))

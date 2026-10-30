@@ -1,6 +1,7 @@
 package com.unciv.logic.llm
 
 import com.unciv.logic.GameInfo
+import com.unciv.logic.automation.unit.CityLocationTileRanker
 import com.unciv.logic.city.City
 import com.unciv.logic.civilization.Civilization
 import com.unciv.logic.civilization.diplomacy.DiplomacyFlags
@@ -391,7 +392,87 @@ class LlmActionCollector {
             }
         }
 
+        actions += collectUnitOrders(civ)
+        actions += collectDiplomaticActions(civ)
         actions += LlmLegalAction.EndTurn()
+        return actions
+    }
+
+    private fun collectUnitOrders(civ: Civilization): List<LlmLegalAction> {
+        val units = civ.units.getCivUnits().toList()
+        if (units.isEmpty()) return emptyList()
+        val actions = ArrayList<LlmLegalAction>()
+
+        for (unit in units.filter { LlmUnitCommander.canFoundCity(civ, it) }.sortedBy { it.id }) {
+            for (site in bestCitySites(civ, unit)) {
+                actions += LlmLegalAction.FoundCity(
+                    id = foundCityId(unit.id, site.position.x, site.position.y),
+                    unitId = unit.id,
+                    unitName = unit.name,
+                    location = LlmHexCoord(site.position.x, site.position.y)
+                )
+            }
+        }
+
+        val armyTiles = units.filter { LlmUnitCommander.isArmyUnit(it) }.map { it.getTile() }
+        if (armyTiles.isNotEmpty()) {
+            val ourTiles = civ.cities.map { it.getCenterTile() } + armyTiles
+            val enemyCities = civ.getCivsAtWarWith()
+                .filter { !it.isBarbarian }
+                .sortedBy { it.civID }
+                .flatMap { enemy ->
+                    enemy.cities
+                        .filter { civ.hasExplored(it.getCenterTile()) }
+                        .sortedWith(compareBy<City> { city -> ourTiles.minOf { it.aerialDistanceTo(city.getCenterTile()) } }
+                            .thenBy { cityIdFor(enemy, it) })
+                        .take(ATTACK_TARGETS_PER_ENEMY)
+                }
+            for (city in enemyCities) {
+                val cityId = cityIdFor(city.civ, city)
+                actions += LlmLegalAction.AttackCity(
+                    id = attackCityId(cityId),
+                    targetCivId = city.civ.civID,
+                    targetCityId = cityId,
+                    targetCityName = city.name,
+                    location = LlmHexCoord(city.location.x, city.location.y)
+                )
+            }
+            for (city in civ.cities.sortedBy { cityIdFor(civ, it) }) {
+                val cityId = cityIdFor(civ, city)
+                actions += LlmLegalAction.DefendCity(defendCityId(cityId), cityId, city.name)
+            }
+        }
+
+        actions += LlmLegalAction.RunUnitAutomation()
+        return actions
+    }
+
+    private fun bestCitySites(civ: Civilization, unit: MapUnit): List<Tile> =
+        CityLocationTileRanker.getBestTilesToFoundCity(unit, minimumValue = 0f).tileRankMap.entries
+            .filter { LlmUnitCommander.canFoundCityOn(civ, unit, it.key) }
+            .filter { it.key == unit.getTile() || unit.movement.canReach(it.key) }
+            .sortedWith(compareByDescending<Map.Entry<Tile, Float>> { it.value }
+                .thenBy { it.key.position.x }
+                .thenBy { it.key.position.y })
+            .take(CITY_SITES_PER_SETTLER)
+            .map { it.key }
+
+    private fun collectDiplomaticActions(civ: Civilization): List<LlmLegalAction> {
+        val actions = ArrayList<LlmLegalAction>()
+        val others = civ.getKnownCivs()
+            .filter { !it.isBarbarian && !it.isSpectator() && !it.isDefeated() }
+            .sortedBy { it.civID }
+            .toList()
+        for (other in others) {
+            val diplomacy = civ.getDiplomacyManager(other) ?: continue
+            if (diplomacy.diplomaticStatus == DiplomaticStatus.War) {
+                val alreadyOffered = other.tradeRequests.any { it.requestingCiv == civ.civID && it.trade.isPeaceTreaty() }
+                if (!alreadyOffered)
+                    actions += LlmLegalAction.OfferPeace(offerPeaceId(other.civID), other.civID, other.civName)
+            } else if (diplomacy.canDeclareWar()) {
+                actions += LlmLegalAction.DeclareWar(declareWarId(other.civID), other.civID, other.civName)
+            }
+        }
         return actions
     }
 
@@ -399,6 +480,8 @@ class LlmActionCollector {
         private const val SUPPORTING_UNIT_RADIUS = 2
         private const val VISIBLE_ENEMY_RADIUS = 5
         private const val VISIBLE_ENEMY_BRIEF_LIMIT = 5
+        private const val ATTACK_TARGETS_PER_ENEMY = 3
+        private const val CITY_SITES_PER_SETTLER = 3
         private val tradeOfferBriefComparator = compareBy<LlmTradeOfferBrief> { it.type }
             .thenBy { it.name }
             .thenBy { it.amount }
@@ -406,6 +489,11 @@ class LlmActionCollector {
         fun chooseTechnologyId(techName: String) = "choose_technology:$techName"
         fun chooseCityConstructionId(cityId: String, constructionName: String) =
             "choose_city_construction:$cityId:$constructionName"
+        fun foundCityId(unitId: Int, x: Int, y: Int) = "found_city:$unitId:$x,$y"
+        fun attackCityId(cityId: String) = "attack_city:$cityId"
+        fun defendCityId(cityId: String) = "defend_city:$cityId"
+        fun declareWarId(civId: String) = "declare_war:$civId"
+        fun offerPeaceId(civId: String) = "offer_peace:$civId"
         fun cityIdFor(civ: Civilization, city: City): String =
             if (city.id != City.NO_ID) city.id
             else "${civ.civName}/${city.location.x},${city.location.y}"
