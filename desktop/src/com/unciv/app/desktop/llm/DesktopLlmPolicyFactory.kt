@@ -35,11 +35,12 @@ class DesktopLlmPolicyFactory {
         )
         "openai-compat" -> OpenAiCompatibleLlmClient(
             model = config.client.model!!,
-            apiKey = apiKey(config.client.apiKeyEnv!!),
+            apiKey = config.client.apiKeyEnv?.let { System.getenv(it) }.orEmpty(),
             baseUrl = config.client.baseUrl!!,
             timeoutSeconds = config.client.timeoutSeconds,
             maxRetries = config.client.maxRetries,
-            extraHeaders = config.client.extraHeaders
+            extraHeaders = config.client.extraHeaders,
+            useTools = config.client.useTools
         )
         else -> throw IllegalArgumentException("Unknown LLM client kind: ${config.client.kind}")
     }

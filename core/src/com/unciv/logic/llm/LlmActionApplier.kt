@@ -11,7 +11,9 @@ import com.unciv.logic.trade.TradeRequest
 import com.unciv.models.ruleset.IConstruction
 
 class LlmActionApplier(
-    private val unitCommander: LlmUnitCommander = LlmUnitCommander()
+    private val unitCommander: LlmUnitCommander = LlmUnitCommander(),
+    /** What end_turn does. The save-file runner advances the game; inside a normal game the turn loop owns that. */
+    private val endTurn: (GameInfo) -> Unit = { it.nextTurn(progressBar = null) }
 ) {
     /** Called by the gateway before applying the actions of one step, so that unit orders don't carry over. */
     fun beginStep() = unitCommander.beginStep()
@@ -30,7 +32,7 @@ class LlmActionApplier(
             is LlmLegalAction.OfferPeace -> applyOfferPeace(gameInfo, civ, action)
             is LlmLegalAction.FoundCity -> applyFoundCity(gameInfo, civ, action)
             is LlmLegalAction.EndTurn -> {
-                gameInfo.nextTurn(progressBar = null)
+                endTurn(gameInfo)
                 null
             }
         }
