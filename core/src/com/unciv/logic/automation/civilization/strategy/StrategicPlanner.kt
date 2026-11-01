@@ -267,7 +267,7 @@ object StrategicPlanner {
         val candidates = civ.threatManager.getNeighboringCivilizations()
             .filter { it.isMajorCiv() && it.isAlive() && it.cities.isNotEmpty() && !civ.isAtWarWith(it) }
             .filter { civ.getDiplomacyManager(it)?.canDeclareWar() == true }
-            .filter { it.getStatForRanking(RankingType.Force) < ourForce * 0.7f }
+            .filter { it.getStatForRanking(RankingType.Force) < ourForce * 0.5f }
         return candidates.firstOrNull { it.civID == current }
             ?: candidates.minByOrNull { it.getStatForRanking(RankingType.Force) }
     }

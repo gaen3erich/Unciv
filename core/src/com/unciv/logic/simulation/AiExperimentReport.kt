@@ -88,6 +88,7 @@ class AiExperimentReport(
         row("Enemy units killed") { it.unitsKilled.toDouble() }
         row("Own units lost") { it.unitsLost.toDouble() }
         appendLine("| Kill / loss ratio | ${killLoss(true)} | ${killLoss(false)} |")
+        row("Own units lost while attacking, %") { if (it.unitsLost == 0) null else 100.0 * it.unitsLostAttacking / it.unitsLost }
         row("Survived to the end, %") { if (it.alive) 100.0 else 0.0 }
         row("AI time per turn, ms") { it.aiTurnMs }
         appendLine()
@@ -114,6 +115,11 @@ class AiExperimentReport(
             val total = civ.phaseTurns.values.sum()
             if (total == 0) null else 100.0 * (civ.phaseTurns[phase] ?: 0) / total
         }
+        for (phase in phases) planRow("Units killed / lost in $phase") { civ ->
+            val lost = civ.unitsLostByPhase[phase] ?: 0
+            if (lost == 0) null else (civ.unitsKilledByPhase[phase] ?: 0).toDouble() / lost
+        }
+        for (phase in phases) planRow("Own units lost in $phase, per game") { civ -> (civ.unitsLostByPhase[phase] ?: 0).toDouble() }
         planRow("Detailed reviews per 100 turns") { civ ->
             val total = civ.phaseTurns.values.sum()
             if (total == 0) null else 100.0 * civ.strategicReviews / total

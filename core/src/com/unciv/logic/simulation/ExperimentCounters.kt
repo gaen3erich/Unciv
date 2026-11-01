@@ -26,4 +26,21 @@ class ExperimentCounters {
     val phaseTurns = IntArray(StrategicPhase.entries.size)
 
     fun countPhaseTurn(phase: StrategicPhase) { phaseTurns[phase.ordinal]++ }
+
+    /** Own military units that died attacking (the rest died defending) */
+    var unitsLostAttacking = 0
+    /** Kills and losses by the strategic phase the civ was in; only counted for civs with a plan */
+    val unitsKilledByPhase = IntArray(StrategicPhase.entries.size)
+    val unitsLostByPhase = IntArray(StrategicPhase.entries.size)
+
+    fun unitKilled(phase: StrategicPhase?) {
+        unitsKilled++
+        if (phase != null) unitsKilledByPhase[phase.ordinal]++
+    }
+
+    fun unitLost(phase: StrategicPhase?, attacking: Boolean) {
+        unitsLost++
+        if (attacking) unitsLostAttacking++
+        if (phase != null) unitsLostByPhase[phase.ordinal]++
+    }
 }

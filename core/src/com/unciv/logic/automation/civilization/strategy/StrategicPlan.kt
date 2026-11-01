@@ -97,10 +97,10 @@ data class StrategicWeights(
                     military = 0.9f, expansion = 0.7f, wonders = 1.2f, production = 1.1f)
                 StrategicPhase.WarPreparation -> StrategicWeights(
                     military = 1.8f, defense = 1.1f, expansion = 0.4f, wonders = 0.6f, production = 1.2f,
-                    science = 0.9f, culture = 0.9f, targetMotivation = 8f)
+                    science = 0.9f, culture = 0.9f, targetMotivation = 4f)
                 StrategicPhase.War -> StrategicWeights(
-                    military = 1.6f, defense = 1.3f, expansion = 0.3f, wonders = 0.5f, production = 1.1f,
-                    warMotivation = -5f, targetMotivation = 5f)
+                    military = 1.2f, defense = 1.3f, expansion = 0.3f, wonders = 0.5f, production = 1.1f,
+                    warMotivation = -5f, targetMotivation = 0f)
                 StrategicPhase.Defense -> StrategicWeights(
                     military = 2.2f, defense = 2f, expansion = 0f, wonders = 0.3f, production = 1.2f,
                     science = 0.8f, culture = 0.8f, warMotivation = -15f)
@@ -109,8 +109,8 @@ data class StrategicWeights(
                 VictoryKind.Science -> base.copy(science = base.science * 1.3f)
                 VictoryKind.Culture -> base.copy(culture = base.culture * 1.35f, wonders = base.wonders * 1.25f,
                     expansion = base.expansion * 0.85f)
-                VictoryKind.Military -> base.copy(military = base.military * 1.25f, production = base.production * 1.1f,
-                    warMotivation = base.warMotivation + 3f)
+                VictoryKind.Military -> base.copy(military = base.military * 1.1f, production = base.production * 1.1f,
+                    warMotivation = base.warMotivation)
                 VictoryKind.Diplomatic -> base.copy(gold = base.gold * 1.3f, warMotivation = base.warMotivation - 3f)
                 VictoryKind.Religion -> base.copy(faith = base.faith * 1.4f)
                 VictoryKind.Other -> base

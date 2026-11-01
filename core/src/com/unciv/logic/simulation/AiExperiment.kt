@@ -72,6 +72,11 @@ data class CivResult(
     val triggeredStrategicReviews: Int = 0,
     /** Turns spent in each strategic phase, by phase name */
     val phaseTurns: Map<String, Int> = emptyMap(),
+    /** Own units that died attacking */
+    val unitsLostAttacking: Int = 0,
+    /** Kills and losses per strategic phase name; empty without a plan */
+    val unitsKilledByPhase: Map<String, Int> = emptyMap(),
+    val unitsLostByPhase: Map<String, Int> = emptyMap(),
 )
 
 /** Result of one game */
@@ -240,6 +245,9 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 strategicReviews = counters.strategicReviews,
                 triggeredStrategicReviews = counters.triggeredStrategicReviews,
                 phaseTurns = StrategicPhase.entries.associate { it.name to counters.phaseTurns[it.ordinal] },
+                unitsLostAttacking = counters.unitsLostAttacking,
+                unitsKilledByPhase = StrategicPhase.entries.associate { it.name to counters.unitsKilledByPhase[it.ordinal] },
+                unitsLostByPhase = StrategicPhase.entries.associate { it.name to counters.unitsLostByPhase[it.ordinal] },
             )
         }
         return GameResult(
