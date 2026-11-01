@@ -28,6 +28,8 @@ object TacticalAutomation {
 
     /** Our force near a city must be this many times the enemy force there before we close in */
     private const val REQUIRED_LOCAL_SUPERIORITY = 1.5f
+    /** Within this distance of our own city, units fight instead of saving themselves */
+    private const val HOME_DEFENSE_RADIUS = 3
 
     @Readonly
     fun isActive(unit: MapUnit): Boolean = unit.civ.aiProfile.has(AiFeature.UnitTactics)
@@ -39,6 +41,8 @@ object TacticalAutomation {
     @Readonly
     fun isAttackSafeEnough(unit: MapUnit, target: AttackableTile): Boolean {
         if (unit.hasUnique(UniqueType.SelfDestructs)) return true
+        // Near our own cities every hit on the attackers counts, even a risky one
+        if (isDefendingHome(unit, target.tileToAttackFrom)) return true
         val defender = Battle.getMapCombatantOfTile(target.tileToAttack) ?: return true
         val attacker = MapUnitCombatant(unit)
         val damageDealt = BattleDamage.calculateDamageToDefender(attacker, defender, target.tileToAttackFrom, 0.5f)
@@ -46,6 +50,8 @@ object TacticalAutomation {
         val killsDefender = damageDealt >= defender.getHealth()
         val canCapture = unit.baseUnit.isMelee() && !unit.hasUnique(UniqueType.CannotCaptureCities)
         if (defender is CityCombatant && killsDefender && canCapture) return true
+        // A siege with enough troops around keeps hitting the city even at a risk: chip damage is the point
+        if (defender is CityCombatant && hasLocalSuperiority(unit, defender.city)) return true
 
         val healthLeft = unit.health - damageTaken
         // Melee units that kill a unit move into its tile; everyone else stays where they attacked from
@@ -65,6 +71,9 @@ object TacticalAutomation {
         val current = unit.getTile()
         // Garrisons defend with the city, leaving makes it easier to take
         if (current.isCityCenter() && current.getOwner() == unit.civ) return false
+        // Don't leave our cities to the attackers, and don't break up a siege we are winning
+        if (isDefendingHome(unit, current)) return false
+        if (isInWinningSiege(unit, current)) return false
         val threats = TacticalThreatMap.of(unit.civ)
         val currentDamage = threats.expectedDamage(unit, current)
         if (currentDamage < unit.health) return false
@@ -79,6 +88,17 @@ object TacticalAutomation {
         unit.movement.moveToTile(best.first)
         return true
     }
+
+    @Readonly
+    private fun isDefendingHome(unit: MapUnit, tile: Tile): Boolean =
+        unit.civ.cities.any { it.getCenterTile().aerialDistanceTo(tile) <= HOME_DEFENSE_RADIUS }
+
+    @Readonly
+    private fun isInWinningSiege(unit: MapUnit, tile: Tile): Boolean =
+        tile.getTilesInDistance(2).any {
+            val city = if (it.isCityCenter()) it.getCity() else null
+            city != null && unit.civ.isAtWarWith(city.civ) && hasLocalSuperiority(unit, city)
+        }
 
     /** Own cities and friendly neighbours make a tile safer than the raw damage says */
     @Readonly
@@ -140,5 +160,6 @@ object TacticalAutomation {
             }
         }
         return ours >= theirs * REQUIRED_LOCAL_SUPERIORITY
+            || city.health * 2 < city.getMaxHealth() && ours >= theirs // a battered city is worth the risk
     }
 }
