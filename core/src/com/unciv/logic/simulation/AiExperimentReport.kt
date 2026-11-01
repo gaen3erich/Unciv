@@ -92,6 +92,35 @@ class AiExperimentReport(
         row("AI time per turn, ms") { it.aiTurnMs }
         appendLine()
         appendLine("Population and cities at turn N only count games that lasted that long.")
+        strategicPlanSection()
+    }
+
+    /** Only for civs that played with a strategic plan: where they spent their turns, how often they replanned */
+    private fun StringBuilder.strategicPlanSection() {
+        val planned = results.flatMap { it.civs }.filter { it.strategicReviews > 0 }
+        if (planned.isEmpty()) return
+        appendLine()
+        appendLine("## Strategic plan (civs that played with one)")
+        appendLine()
+        appendLine("| metric | candidate | baseline |")
+        appendLine("|---|---|---|")
+        fun planRow(name: String, value: (CivResult) -> Double?) {
+            fun side(candidate: Boolean) = planned.filter { it.isCandidate == candidate }
+                .mapNotNull(value).let { if (it.isEmpty()) "–" else fmt(it.average()) }
+            appendLine("| $name | ${side(true)} | ${side(false)} |")
+        }
+        val phases = planned.flatMap { it.phaseTurns.keys }.distinct()
+        for (phase in phases) planRow("Turns in $phase, %") { civ ->
+            val total = civ.phaseTurns.values.sum()
+            if (total == 0) null else 100.0 * (civ.phaseTurns[phase] ?: 0) / total
+        }
+        planRow("Detailed reviews per 100 turns") { civ ->
+            val total = civ.phaseTurns.values.sum()
+            if (total == 0) null else 100.0 * civ.strategicReviews / total
+        }
+        planRow("Of those triggered by events, %") { civ ->
+            100.0 * civ.triggeredStrategicReviews / civ.strategicReviews
+        }
     }
 
     private fun StringBuilder.row(name: String, value: (CivResult) -> Double?) {

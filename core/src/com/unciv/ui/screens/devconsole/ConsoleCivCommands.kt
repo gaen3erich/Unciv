@@ -44,6 +44,14 @@ internal class ConsoleCivCommands : ConsoleCommandNode {
             DevConsoleResponse.hint("${civ.civID} now plays with: ${civ.aiProfile.features.joinToString().ifEmpty { "no features" }}")
         },
 
+        "aiplan" to ConsoleAction("civ aiplan <civName>") { console, params ->
+            val civ = console.getCivByName(params[0])
+            val plan = civ.aiMemory.strategicPlan
+            val enabled = if (civ.aiProfile.has(AiFeature.StrategicPlan)) "" else " (StrategicPlan feature is off for this civ)"
+            val history = if (plan.history.isEmpty()) "" else ". Changes: ${plan.history.joinToString("; ")}"
+            DevConsoleResponse.hint("${civ.civID}: $plan$enabled$history")
+        },
+
         "revealmap" to ConsoleAction("civ revealmap [civName]") { console, params ->
             val civ = console.getCivByNameOrSelected(params.getOrNull(0))
             civ.gameInfo.tileMap.values.asSequence()

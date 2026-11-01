@@ -2,6 +2,7 @@ package com.unciv.logic.simulation
 
 import com.unciv.Constants
 import com.unciv.logic.GameInfo
+import com.unciv.logic.automation.civilization.strategy.StrategicPhase
 import com.unciv.logic.GameStarter
 import com.unciv.logic.automation.AiProfile
 import com.unciv.logic.civilization.Civilization
@@ -65,6 +66,12 @@ data class CivResult(
     val citiesConquered: Int,
     val citiesLost: Int,
     val aiTurnMs: Double,
+    /** Detailed strategic plan reviews; 0 when the civ played without a plan */
+    val strategicReviews: Int = 0,
+    /** Of those, reviews caused by an event rather than the schedule */
+    val triggeredStrategicReviews: Int = 0,
+    /** Turns spent in each strategic phase, by phase name */
+    val phaseTurns: Map<String, Int> = emptyMap(),
 )
 
 /** Result of one game */
@@ -230,6 +237,9 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 citiesConquered = counters.citiesConquered,
                 citiesLost = counters.citiesLost,
                 aiTurnMs = if (counters.aiTurns == 0) 0.0 else counters.aiTurnNanos / 1e6 / counters.aiTurns,
+                strategicReviews = counters.strategicReviews,
+                triggeredStrategicReviews = counters.triggeredStrategicReviews,
+                phaseTurns = StrategicPhase.entries.associate { it.name to counters.phaseTurns[it.ordinal] },
             )
         }
         return GameResult(

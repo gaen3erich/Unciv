@@ -4,6 +4,7 @@ import com.unciv.GUI
 import com.unciv.UncivGame
 import com.unciv.logic.automation.Automation
 import com.unciv.logic.automation.civilization.NextTurnAutomation
+import com.unciv.logic.automation.civilization.strategy.StrategicPlanner
 import com.unciv.logic.automation.unit.WorkerAutomation
 import com.unciv.logic.city.CityConstructions
 import com.unciv.logic.civilization.CityAction
@@ -79,6 +80,10 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
     private val allTechsAreResearched = civInfo.tech.allTechsAreResearched()
 
     private val isAtWar = civInfo.isAtWar()
+    /** Multipliers from the civ's strategic plan, neutral when there is none */
+    private val strategy = StrategicPlanner.weights(civInfo)
+    /** At war, or the strategic plan expects one: all cities may build units */
+    private val onWarFooting = isAtWar || StrategicPlanner.activePlan(civInfo)?.phase?.isMilitary() == true
     private val buildingsForVictory = civInfo.gameInfo.getEnabledVictories().values
             .mapNotNull { civInfo.victoryManager.getNextMilestone(it) }
             .filter { it.type == MilestoneType.BuiltBuilding || it.type == MilestoneType.BuildingBuiltGlobally }
@@ -157,11 +162,13 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
     }
 
     private fun addMilitaryUnitChoice() {
-        if (!isAtWar && !cityIsOverAverageProduction) return // don't make any military units here. Infrastructure first!
+        if (!onWarFooting && !cityIsOverAverageProduction) return // don't make any military units here. Infrastructure first!
         // There is a risk however, that these cities run out of things to build, and start to construct nothing
         if (civInfo.stats.getUnitSupplyDeficit() > 0) return // we don't want more units if it's already hurting our empire
         // todo: add worker disbandment and consumption of great persons if under attack & short on unit supply
-        if (!isAtWar && (civInfo.stats.statsForNextTurn.gold < 0 || militaryUnits > max(7, cities * 5))) return
+        // Preparing for war (strategic plan) allows a bigger peacetime army, but still not at a loss of gold
+        val peacetimeUnitCap = max(7, cities * 5) * (if (onWarFooting) 1.5f else 1f)
+        if (!isAtWar && (civInfo.stats.statsForNextTurn.gold < 0 || militaryUnits > peacetimeUnitCap)) return
         if (civInfo.gold < -50) return
 
         val militaryUnit = Automation.chooseMilitaryUnit(city, units) ?: return
@@ -180,6 +187,7 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
 
         if (!civInfo.isAIOrAutoPlaying()) modifier /= 2 // Players prefer to make their own unit choices usually
         modifier *= personality.modifierFocus(PersonalityValue.Military, .3f)
+        modifier *= strategy.military
         addChoice(relativeCostEffectiveness, militaryUnit, modifier)
     }
 
@@ -264,7 +272,8 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
             if (building.isWonder && city.isPuppet) continue
             // We shouldn't try to build wonders in undeveloped cities and empires
             if (building.isWonder && (!cityIsOverAverageProduction || civInfo.cities.sumOf { it.population.population } < 12)) continue
-            addChoice(relativeCostEffectiveness, building, getValueOfBuilding(building))
+            val value = getValueOfBuilding(building) * if (building.isWonder) strategy.wonders else 1f
+            addChoice(relativeCostEffectiveness, building, value)
         }
     }
 
@@ -326,6 +335,7 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
                     .mapNotNull { NextTurnAutomation.getForeignCityNearCapital(it.getCapital(), civInfo) }
                     .any { it.city == city })
             warModifier *= 2f
+        warModifier *= strategy.defense
         value += warModifier * building.cityHealth.toFloat() / city.getMaxHealth() * personality.inverseModifierFocus(PersonalityValue.Aggressive, .3f)
         value += warModifier * building.cityStrength.toFloat() / (city.getStrength() + 3) * personality.inverseModifierFocus(PersonalityValue.Aggressive, .3f) // The + 3 here is to reduce the priority of building walls immedietly
 
@@ -334,6 +344,7 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
             modifier *= if (cityIsOverAverageProduction) 1f else 0.2f // You shouldn't be cranking out units anytime soon
             modifier *= personality.modifierFocus(PersonalityValue.Military, 0.3f)
             modifier *= personality.modifierFocus(PersonalityValue.Aggressive, 0.2f).coerceAtLeast(1f) // Defensive civs can still want a good military
+            modifier *= strategy.military
             value += modifier
         }
         if (building.hasUnique(UniqueType.EnablesNuclearWeapons) && !civInfo.hasUnique(UniqueType.EnablesNuclearWeapons))
@@ -359,7 +370,7 @@ class ConstructionAutomation(val cityConstructions: CityConstructions) {
         }
 
         for (stat in Stat.entries) {
-            buildingStats[stat] *= personality.scaledFocus(PersonalityValue[stat])
+            buildingStats[stat] *= personality.scaledFocus(PersonalityValue[stat]) * strategy.forStat(stat)
         }
 
         return Automation.rankStatsValue(buildingStats.clone(), civInfo)

@@ -16,6 +16,7 @@ import yairm210.purity.annotations.Readonly
  */
 enum class AiFeature(val enabledByDefault: Boolean, val description: String) {
     GreatPersonEscort(false, "Military units escort great people, not only settlers"),
+    StrategicPlan(false, "Long-term goal and phase (expansion, development, war preparation, war, defense) that tilt tech, policy, production and war decisions"),
     ;
 
     companion object {

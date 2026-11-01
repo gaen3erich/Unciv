@@ -4,7 +4,9 @@ import com.unciv.Constants
 import com.unciv.UncivGame
 import com.unciv.json.LastSeenImprovement
 import com.unciv.logic.*
+import com.unciv.logic.automation.AiMemory
 import com.unciv.logic.automation.AiProfile
+import com.unciv.logic.automation.civilization.strategy.StrategicPlanner
 import com.unciv.logic.automation.unit.WorkerAutomation
 import com.unciv.logic.city.City
 import com.unciv.logic.city.managers.CityFounder
@@ -85,6 +87,9 @@ class Civilization : IsPartOfGameInfoSerialization {
     /** Serialization field for [aiProfile], an [AiProfile.parse] spec; empty means default */
     var aiProfileSpec = ""
         private set
+
+    /** What this civ's AI remembers between turns, such as its strategic plan */
+    var aiMemory = AiMemory()
 
     /** Counters collected for AI experiments; cheap enough to always keep, not saved */
     @Transient
@@ -300,6 +305,7 @@ class Civilization : IsPartOfGameInfoSerialization {
         val toReturn = Civilization()
         toReturn.aiProfileSpec = aiProfileSpec
         toReturn.aiProfile = aiProfile
+        toReturn.aiMemory = aiMemory.clone()
         toReturn.gold = gold
         toReturn.playerType = playerType
         toReturn.playerId = playerId
@@ -446,6 +452,9 @@ class Civilization : IsPartOfGameInfoSerialization {
         val victoryTypes = gameInfo.gameParameters.victoryTypes
         if (victoryTypes.size == 1)
             return listOf(victoryTypes.first()) // That is the most relevant one
+        // The strategic plan re-evaluates the goal during the game; personality is only its starting point
+        val plannedGoal = StrategicPlanner.activePlan(this)?.goal
+        if (!plannedGoal.isNullOrEmpty() && plannedGoal in victoryTypes) return listOf(plannedGoal)
         val victoryType: List<String> = listOf(nation.preferredVictoryType, getPersonality().preferredVictoryType)
             .filter { it in gameInfo.gameParameters.victoryTypes && it in gameInfo.ruleset.victories }
         return victoryType.ifEmpty { listOf(Constants.neutralVictoryType) }
