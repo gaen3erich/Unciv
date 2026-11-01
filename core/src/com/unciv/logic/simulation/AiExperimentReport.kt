@@ -90,6 +90,12 @@ class AiExperimentReport(
         appendLine("| Kill / loss ratio | ${killLoss(true)} | ${killLoss(false)} |")
         row("Own units lost while attacking, %") { if (it.unitsLost == 0) null else 100.0 * it.unitsLostAttacking / it.unitsLost }
         row("Survived to the end, %") { if (it.alive) 100.0 else 0.0 }
+        if (results.any { game -> game.civs.any { it.tacticalEscapes + it.tacticalStops + it.tacticalAttacksSkipped > 0 } }) {
+            row("Tactics: attack options skipped as too dangerous") { it.tacticalAttacksSkipped.toDouble() }
+            row("Tactics: escapes from deadly tiles") { it.tacticalEscapes.toDouble() }
+            row("Tactics: advances stopped short of deadly tiles") { it.tacticalStops.toDouble() }
+            row("Tactics: city approaches held for superiority") { it.tacticalStagingHolds.toDouble() }
+        }
         row("AI time per turn, ms") { it.aiTurnMs }
         appendLine()
         appendLine("Population and cities at turn N only count games that lasted that long.")

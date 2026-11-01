@@ -27,6 +27,15 @@ class ExperimentCounters {
 
     fun countPhaseTurn(phase: StrategicPhase) { phaseTurns[phase.ordinal]++ }
 
+    /** [com.unciv.logic.automation.AiFeature.UnitTactics]: attack options dropped as too dangerous */
+    var tacticalAttacksSkipped = 0
+    /** UnitTactics: units that stepped off a tile where they would probably have been killed */
+    var tacticalEscapes = 0
+    /** UnitTactics: advances that stopped short of a deadly tile */
+    var tacticalStops = 0
+    /** UnitTactics: approaches to an enemy city held back for lack of local superiority */
+    var tacticalStagingHolds = 0
+
     /** Own military units that died attacking (the rest died defending) */
     var unitsLostAttacking = 0
     /** Kills and losses by the strategic phase the civ was in; only counted for civs with a plan */

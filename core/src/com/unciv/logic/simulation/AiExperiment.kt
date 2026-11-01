@@ -77,6 +77,11 @@ data class CivResult(
     /** Kills and losses per strategic phase name; empty without a plan */
     val unitsKilledByPhase: Map<String, Int> = emptyMap(),
     val unitsLostByPhase: Map<String, Int> = emptyMap(),
+    /** UnitTactics decisions, see [ExperimentCounters] */
+    val tacticalAttacksSkipped: Int = 0,
+    val tacticalEscapes: Int = 0,
+    val tacticalStops: Int = 0,
+    val tacticalStagingHolds: Int = 0,
 )
 
 /** Result of one game */
@@ -248,6 +253,10 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 unitsLostAttacking = counters.unitsLostAttacking,
                 unitsKilledByPhase = StrategicPhase.entries.associate { it.name to counters.unitsKilledByPhase[it.ordinal] },
                 unitsLostByPhase = StrategicPhase.entries.associate { it.name to counters.unitsLostByPhase[it.ordinal] },
+                tacticalAttacksSkipped = counters.tacticalAttacksSkipped,
+                tacticalEscapes = counters.tacticalEscapes,
+                tacticalStops = counters.tacticalStops,
+                tacticalStagingHolds = counters.tacticalStagingHolds,
             )
         }
         return GameResult(
