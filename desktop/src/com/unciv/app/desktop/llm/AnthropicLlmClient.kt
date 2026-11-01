@@ -35,7 +35,14 @@ class AnthropicLlmClient(
     private fun requestBody(request: LlmRequest): String = buildString {
         append("{")
         append("\"model\":").append(jsonString(model)).append(",")
-        append("\"system\":").append(jsonString(request.systemPrompt)).append(",")
+        append("\"system\":")
+        if (request.cacheSystemPrompt) {
+            // Tools and system prompt are identical on every step; the breakpoint caches both.
+            // Below the provider's minimum cacheable length this is ignored, not an error.
+            append("[{\"type\":\"text\",\"text\":").append(jsonString(request.systemPrompt))
+            append(",\"cache_control\":{\"type\":\"ephemeral\"}}]")
+        } else append(jsonString(request.systemPrompt))
+        append(",")
         append("\"messages\":[{\"role\":\"user\",\"content\":").append(jsonString(firstUserMessage(request))).append("}],")
         append("\"max_tokens\":").append(request.maxTokens).append(",")
         append("\"temperature\":").append(request.temperature)

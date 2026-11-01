@@ -14,6 +14,8 @@ data class LlmCallTrace(
     val parsePath: String,
     val fallbackUsed: String?,
     val rationale: String? = null,
+    val notes: String? = null,
+    val userPromptChars: Int = 0,
     val systemPrompt: String? = null,
     val userPrompt: String? = null
 )

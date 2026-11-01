@@ -6,7 +6,9 @@ import com.unciv.logic.llm.LlmPolicy
 import com.unciv.logic.llm.client.LlmClient
 import com.unciv.logic.llm.client.LlmClientException
 import com.unciv.logic.llm.client.LlmResponse
+import com.unciv.logic.llm.prompt.LlmActionAliases
 import com.unciv.logic.llm.prompt.LlmPromptBuilder
+import com.unciv.logic.llm.prompt.LlmPromptMemory
 import com.unciv.logic.llm.prompt.LlmResponseParser
 import java.security.MessageDigest
 
@@ -19,8 +21,16 @@ class RealLlmPolicy(
 ) : LlmPolicy, LlmTraceablePolicy {
     private var lastTrace: LlmCallTrace? = null
 
+    /**
+     * Carried between steps, per game and civ: the observation of the last successful decision,
+     * its actions and the model's notes.
+     */
+    private val memories = HashMap<String, LlmPromptMemory>()
+
     override fun chooseActions(observation: LlmObservation): List<LlmLegalAction> {
-        val request = promptBuilder.build(observation, observation.currentPlayerCivName)
+        val memoryKey = "${observation.gameId}/${observation.currentPlayerCivId}"
+        val currentMemory = memories[memoryKey]
+        val request = promptBuilder.build(observation, observation.currentPlayerCivName, currentMemory)
         val userPrompt = request.messages.firstOrNull()?.content.orEmpty()
         val response = try {
             client.send(request)
@@ -31,7 +41,13 @@ class RealLlmPolicy(
 
         return when (val result = parser.parse(response, observation)) {
             is LlmResponseParser.ParseResult.Success -> {
-                lastTrace = traceForResponse(request.systemPrompt, userPrompt, request.kind.name, response, true, result.parsePath.name, null, result.rationale)
+                val aliases = LlmActionAliases.of(observation)
+                memories[memoryKey] = LlmPromptMemory(
+                    previousObservation = observation,
+                    lastDecision = result.actions.map { aliases.aliasOf(it) },
+                    notes = result.notes ?: currentMemory?.notes
+                )
+                lastTrace = traceForResponse(request.systemPrompt, userPrompt, request.kind.name, response, true, result.parsePath.name, null, result.rationale, result.notes)
                 result.actions
             }
             is LlmResponseParser.ParseResult.Failure -> {
@@ -61,6 +77,7 @@ class RealLlmPolicy(
             parsedSuccessfully = false,
             parsePath = "FAILED",
             fallbackUsed = "client_error",
+            userPromptChars = userPrompt.length,
             systemPrompt = if (includePrompts) systemPrompt else null,
             userPrompt = if (includePrompts) userPrompt else null
         )
@@ -73,7 +90,8 @@ class RealLlmPolicy(
         parsedSuccessfully: Boolean,
         parsePath: String,
         fallbackUsed: String?,
-        rationale: String?
+        rationale: String?,
+        notes: String? = null
     ) = LlmCallTrace(
         clientId = client.identifier,
         requestKind = kind,
@@ -88,6 +106,8 @@ class RealLlmPolicy(
         parsePath = parsePath,
         fallbackUsed = fallbackUsed,
         rationale = rationale,
+        notes = notes,
+        userPromptChars = userPrompt.length,
         systemPrompt = if (includePrompts) systemPrompt else null,
         userPrompt = if (includePrompts) userPrompt else null
     )

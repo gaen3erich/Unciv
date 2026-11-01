@@ -29,6 +29,28 @@ class LlmResponseParserTests {
     }
 
     @Test
+    fun `parses short alias and notes`() {
+        val war = LlmLegalAction.DeclareWar("declare_war:Egypt", "Egypt", "Egypt")
+        val observation = RandomPolicySmokeTests.observationWithLegalActionsForTests(war, endTurn)
+        val response = response(toolCall = """{"actions":[{"id":"war:Egypt"},{"id":"end_turn"}],"notes":"take Thebes"}""")
+
+        val result = parser.parse(response, observation)
+
+        result as LlmResponseParser.ParseResult.Success
+        assertEquals(listOf(war, endTurn), result.actions)
+        assertEquals("take Thebes", result.notes)
+    }
+
+    @Test
+    fun `notes are truncated`() {
+        val response = response(toolCall = """{"actions":[{"id":"end_turn"}],"notes":"${"x".repeat(2000)}"}""")
+
+        val result = parser.parse(response, observation) as LlmResponseParser.ParseResult.Success
+
+        assertEquals(LlmPromptBuilder.NOTES_MAX_CHARS, result.notes!!.length)
+    }
+
+    @Test
     fun `unknown action id fails`() {
         val response = response(toolCall = """{"actions":[{"kind":"EndTurn","id":"not_legal"}]}""")
 

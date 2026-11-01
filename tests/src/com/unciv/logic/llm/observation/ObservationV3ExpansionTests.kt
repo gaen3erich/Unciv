@@ -24,11 +24,22 @@ class ObservationV3ExpansionTests {
     @Test
     fun `nearest foreign city is included geometrically`() {
         val fixture = LlmGatewayTestFixtures.twoHumanCivGame()
+        fixture.secondCiv.cities.single().getCenterTile().setExplored(fixture.firstCiv, true)
 
         val pressure = LlmActionCollector().buildObservation(fixture.gameInfo, fixture.firstCiv).cities.first().expansionPressure
         val nearestForeignCity = pressure.nearestForeignCity!!
 
         assertEquals(fixture.secondCiv.civName, nearestForeignCity.civName)
         assertEquals(fixture.secondCiv.cities.single().name, nearestForeignCity.cityName)
+    }
+
+    @Test
+    fun `unexplored foreign city is not revealed`() {
+        val fixture = LlmGatewayTestFixtures.twoHumanCivGame()
+        fixture.secondCiv.cities.single().getCenterTile().setExplored(fixture.firstCiv, false)
+
+        val pressure = LlmActionCollector().buildObservation(fixture.gameInfo, fixture.firstCiv).cities.first().expansionPressure
+
+        assertNull(pressure.nearestForeignCity)
     }
 }

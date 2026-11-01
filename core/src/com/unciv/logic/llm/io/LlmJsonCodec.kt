@@ -364,6 +364,8 @@ class LlmJsonCodec {
         field("parsePath", trace.parsePath),
         rawField("fallbackUsed", trace.fallbackUsed?.let { quote(it) } ?: "null"),
         rawField("rationale", trace.rationale?.let { quote(it) } ?: "null"),
+        rawField("notes", trace.notes?.let { quote(it) } ?: "null"),
+        rawField("userPromptChars", trace.userPromptChars.toString()),
         rawField("systemPrompt", trace.systemPrompt?.let { quote(it) } ?: "null"),
         rawField("userPrompt", trace.userPrompt?.let { quote(it) } ?: "null")
     )

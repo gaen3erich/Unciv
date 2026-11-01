@@ -27,12 +27,16 @@ class LlmResponseParser {
         return try {
             val json = JsonReader().parse(jsonText)
             val actionsNode = json.get("actions") ?: return null
-            val legalById = observation.legalActions.associateBy { it.id }
+            val aliases = LlmActionAliases.of(observation)
             val actions = actionsNode.map { node ->
                 val id = node.getString("id")
-                legalById[id] ?: return ParseResult.Failure("Action id is not legal in current observation: $id", jsonText, path)
+                aliases.resolve(id) ?: return ParseResult.Failure("Action id is not legal in current observation: $id", jsonText, path)
             }
-            ParseResult.Success(actions, json.getString("rationale", null), path)
+            val notes = json.getString("notes", null)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.take(LlmPromptBuilder.NOTES_MAX_CHARS)
+            ParseResult.Success(actions, json.getString("rationale", null), path, notes)
         } catch (_: SerializationException) {
             null
         } catch (ex: Exception) {
@@ -95,7 +99,8 @@ class LlmResponseParser {
         data class Success(
             val actions: List<LlmLegalAction>,
             val rationale: String?,
-            override val parsePath: ParsePath
+            override val parsePath: ParsePath,
+            val notes: String? = null
         ) : ParseResult
 
         data class Failure(
