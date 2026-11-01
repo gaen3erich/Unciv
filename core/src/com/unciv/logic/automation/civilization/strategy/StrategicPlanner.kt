@@ -11,7 +11,6 @@ import com.unciv.ui.screens.victoryscreen.RankingType
 import yairm210.purity.annotations.Readonly
 import org.jetbrains.annotations.VisibleForTesting
 import kotlin.math.pow
-import kotlin.math.roundToInt
 
 /**
  * Keeps a civ's [StrategicPlan] up to date.
@@ -155,6 +154,7 @@ object StrategicPlanner {
             plan.goalSinceTurn = turn
         }
 
+        updateExpansion(civ, plan)
         val (phase, target) = choosePhase(civ, plan, turn)
         val peacefulChange = phase in PEACEFUL_PHASES && plan.phase in PEACEFUL_PHASES
         val mayChange = firstReview || trigger.urgent || !peacefulChange || turn - plan.phaseSinceTurn >= MIN_PHASE_TURNS
@@ -272,32 +272,25 @@ object StrategicPlanner {
             ?: candidates.minByOrNull { it.getStatForRanking(RankingType.Force) }
     }
 
+    /** The last detailed review's answer to "new city or develop the old ones?" */
     @VisibleForTesting
-    fun desiredCities(civ: Civilization): Int =
-        3 + (civ.getPersonality().expansion * 0.6f).roundToInt()
+    fun wantsToExpand(civ: Civilization): Boolean = civ.aiMemory.strategicPlan.expansionWanted
 
+    /** Re-evaluates expansion: whether the next settler pays off better than buildings, and where it should go */
     @VisibleForTesting
-    fun wantsToExpand(civ: Civilization): Boolean {
-        if (civ.cities.isEmpty()) return true
-        if (civ.cities.size >= desiredCities(civ)) return false
-        if (CivilianUnitAutomation.isLateGame(civ)) return false
-        return hasFreeCitySpot(civ)
-    }
-
-    /** Is there explored, unclaimed land near our cities where a new city could stand? */
-    @VisibleForTesting
-    fun hasFreeCitySpot(civ: Civilization): Boolean {
-        val checked = HashSet<com.unciv.logic.map.tile.Tile>()
-        for (city in civ.cities) {
-            for (tile in city.getCenterTile().getTilesInDistanceRange(3..6)) {
-                if (!checked.add(tile)) continue
-                if (!tile.isLand || tile.isImpassible() || tile.getOwner() != null) continue
-                if (!tile.isExplored(civ)) continue
-                if (tile.getTilesInDistance(3).any { it.isCityCenter() }) continue
-                return true
-            }
+    fun updateExpansion(civ: Civilization, plan: StrategicPlan) {
+        if (civ.cities.isEmpty() || CivilianUnitAutomation.isLateGame(civ)) {
+            plan.expansionWanted = civ.cities.isEmpty()
+            plan.settleTarget = null
+            plan.settlerBuilder = ""
+            plan.expansionNote = if (civ.cities.isEmpty()) "no cities" else "late game"
+            return
         }
-        return false
+        val decision = ExpansionEvaluator.evaluate(civ)
+        plan.expansionWanted = decision.expand
+        plan.settleTarget = if (decision.expand) decision.target?.position else null
+        plan.settlerBuilder = if (decision.expand) decision.builder?.id ?: "" else ""
+        plan.expansionNote = decision.toString()
     }
 
     // endregion

@@ -601,10 +601,15 @@ object NextTurnAutomation {
         if (civInfo.isCityState) return
         if (civInfo.isOneCityChallenger()) return
         if (civInfo.cities.none()) return
-        if (civInfo.getHappiness() <= civInfo.cities.size) return
-        if (CivilianUnitAutomation.isLateGame(civInfo)) return // all suitable land should be occupied already; there will only be a risk of the settler getting bombed
-        val expansionWeight = StrategicPlanner.weights(civInfo).expansion
-        if (expansionWeight <= 0.5f) return // the plan says we have more pressing things to do (war)
+        // With a strategic plan, the plan's expansion evaluation replaces the happiness and late game rules of thumb
+        val plan = StrategicPlanner.activePlan(civInfo)
+        if (plan == null) {
+            if (civInfo.getHappiness() <= civInfo.cities.size) return
+            if (CivilianUnitAutomation.isLateGame(civInfo)) return // all suitable land should be occupied already; there will only be a risk of the settler getting bombed
+        } else {
+            if (!plan.expansionWanted) return // developing our cities pays off better, or the plan is busy with a war
+            if (StrategicPlanner.weights(civInfo).expansion <= 0.5f) return
+        }
 
         // This is a tough one - if we don't ignore conditionals we could have units that can found only on certain tiles that are ignored
         // If we DO ignore conditionals we could get a unit that can only found if there's a certain tech, or something
@@ -621,13 +626,20 @@ object NextTurnAutomation {
 
         if (civInfo.units.getCivUnits().count { it.isMilitary() } < civInfo.cities.size) return // We need someone to defend them first
 
+        if (plan != null) {
+            // The plan already compared build time and distance to the target for every city
+            val builder = civInfo.cities.firstOrNull { it.id == plan.settlerBuilder }
+                ?.takeIf { !it.isPuppet && it.population.population >= 2 && !it.isInResistance() }
+                ?: return
+            builder.cityConstructions.setCurrentConstruction(settlerUnits.minByOrNull { it.cost }!!.name)
+            return
+        }
+
         val bestCity = civInfo.cities
             .filterNot { it.isPuppet || it.population.population < 3 }
             .maxByOrNull { it.cityStats.currentCityStats.production }
             ?: return
-        // While expanding, one building is enough before the city starts producing settlers
-        val buildingsBeforeSettling = if (expansionWeight > 1.2f) 1 else 2
-        if (bestCity.cityConstructions.getBuiltBuildings().count() >= buildingsBeforeSettling) // otherwise focus on self first
+        if (bestCity.cityConstructions.getBuiltBuildings().count() > 1) // 2 buildings or more, otherwise focus on self first
             bestCity.cityConstructions.setCurrentConstruction(settlerUnits.minByOrNull { it.cost }!!.name)
     }
 

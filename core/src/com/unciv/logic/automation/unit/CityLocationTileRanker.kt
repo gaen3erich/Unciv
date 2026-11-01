@@ -63,6 +63,17 @@ object CityLocationTileRanker {
         return bestTilesToFoundCity
     }
 
+    /**
+     * Ranks [tile] as a city location for [civ] without a settler, as used by the strategic plan.
+     * @return null when [civ] may not found a city there
+     */
+    fun rankLocationForCiv(tile: Tile, civ: Civilization, baseTileMap: HashMap<Tile, Float>): Float? {
+        val nearbyCities = civ.gameInfo.getCities()
+            .filter { it.getCenterTile().aerialDistanceTo(tile) <= 8 }
+        if (!canSettleTile(tile, civ, nearbyCities)) return null
+        return rankTileToSettle(tile, civ, nearbyCities, baseTileMap)
+    }
+
     @Readonly
     private fun canSettleTile(tile: Tile, civ: Civilization, nearbyCities: Sequence<City>): Boolean {
         val modConstants = civ.gameInfo.ruleset.modOptions.constants

@@ -1,5 +1,7 @@
 package com.unciv.logic.automation
 
+import com.unciv.Constants
+import com.unciv.logic.automation.civilization.strategy.ExpansionEvaluator
 import com.unciv.logic.automation.civilization.strategy.SituationSnapshot
 import com.unciv.logic.automation.civilization.strategy.StrategicPhase
 import com.unciv.logic.automation.civilization.strategy.StrategicPlan
@@ -169,5 +171,44 @@ class StrategicPlanTests {
         val plan: StrategicPlan = civ.aiMemory.strategicPlan
         if (game.gameInfo.gameParameters.victoryTypes.size > 1)
             assertEquals(listOf(plan.goal), civ.getPreferredVictoryTypes())
+    }
+
+    @Test
+    fun expansionFindsSpotAndComparesWithBuildings() {
+        // A bigger grassland map with only our city on it: there must be a free spot worth a settler
+        game = TestGame()
+        game.makeHexagonalMap(12, Constants.grassland)
+        val loner = game.addCiv()
+        loner.aiProfile = AiProfile.parse("default+StrategicPlan")
+        val city = game.addCity(loner, game.getTile(0, 0))
+        city.population.setPopulation(3)
+        city.cityStats.update()
+        for (tile in game.tileMap.values) tile.setExplored(loner, true)
+
+        val decision = ExpansionEvaluator.evaluate(loner)
+        assertNotNull(decision.target)
+        assertEquals(city, decision.builder)
+        assertTrue(decision.newCityValue > 0f)
+        val distance = decision.target!!.aerialDistanceTo(city.getCenterTile())
+        assertTrue(distance in 3..ExpansionEvaluator.SEARCH_RADIUS)
+
+        StrategicPlanner.update(loner)
+        val plan = loner.aiMemory.strategicPlan
+        assertEquals(decision.expand, plan.expansionWanted)
+        if (plan.expansionWanted) {
+            assertEquals(decision.target!!.position, plan.settleTarget)
+            assertEquals(StrategicPhase.Expansion, plan.phase)
+        }
+    }
+
+    @Test
+    fun noExpansionWithoutExploredLand() {
+        game = TestGame()
+        game.makeHexagonalMap(12, Constants.grassland)
+        val loner = game.addCiv()
+        game.addCity(loner, game.getTile(0, 0))
+        // Nothing explored beyond what the city sees, and city vision is 2-3 tiles: no spot at distance >= 3 known
+        for (tile in game.tileMap.values) tile.setExplored(loner, false)
+        assertNull(ExpansionEvaluator.evaluate(loner).target)
     }
 }

@@ -1,6 +1,7 @@
 package com.unciv.logic.automation.civilization.strategy
 
 import com.unciv.logic.IsPartOfGameInfoSerialization
+import com.unciv.logic.map.HexCoord
 import com.unciv.models.ruleset.MilestoneType
 import com.unciv.models.ruleset.Victory
 import com.unciv.models.stats.Stat
@@ -165,6 +166,15 @@ class StrategicPlan : IsPartOfGameInfoSerialization {
     /** We gave up a war preparation of our own and don't start another one before this turn */
     var noOwnWarPlansUntilTurn = 0
 
+    /** Whether the next settler is worth more than developing our cities, see [ExpansionEvaluator] */
+    var expansionWanted = false
+    /** Where the next city should be founded; settlers head here */
+    var settleTarget: HexCoord? = null
+    /** id of the city that should build the next settler */
+    var settlerBuilder = ""
+    /** Numbers behind the last expansion decision, for the dev console */
+    var expansionNote = ""
+
     /** -1 means the plan was never reviewed, so it has no opinion yet */
     var lastReviewTurn = -1
     var nextReviewTurn = 0
@@ -194,6 +204,10 @@ class StrategicPlan : IsPartOfGameInfoSerialization {
         toReturn.phaseSinceTurn = phaseSinceTurn
         toReturn.warTarget = warTarget
         toReturn.noOwnWarPlansUntilTurn = noOwnWarPlansUntilTurn
+        toReturn.expansionWanted = expansionWanted
+        toReturn.settleTarget = settleTarget
+        toReturn.settlerBuilder = settlerBuilder
+        toReturn.expansionNote = expansionNote
         toReturn.lastReviewTurn = lastReviewTurn
         toReturn.nextReviewTurn = nextReviewTurn
         toReturn.lastReviewReason = lastReviewReason
@@ -206,6 +220,7 @@ class StrategicPlan : IsPartOfGameInfoSerialization {
         if (!isActive()) "no plan yet"
         else "goal $goal ($goalKind) since turn $goalSinceTurn, phase $phase since turn $phaseSinceTurn" +
             (if (warTarget.isNotEmpty()) ", target $warTarget" else "") +
+            ", expansion: $expansionNote" +
             ", last review turn $lastReviewTurn ($lastReviewReason), next by turn $nextReviewTurn"
 
     companion object {
