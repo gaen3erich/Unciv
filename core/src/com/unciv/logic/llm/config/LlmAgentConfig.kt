@@ -19,7 +19,9 @@ data class LlmClientConfig(
     val timeoutSeconds: Int,
     val maxRetries: Int,
     val extraHeaders: Map<String, String>,
-    val transcriptPath: String?
+    val transcriptPath: String?,
+    /** openai-compat only: false sends no tools and asks for the JSON in the text, for servers without tool calling */
+    val useTools: Boolean = true
 )
 
 data class LlmRequestConfig(

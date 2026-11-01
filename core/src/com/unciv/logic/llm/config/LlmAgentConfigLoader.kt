@@ -32,7 +32,8 @@ class LlmAgentConfigLoader {
                 timeoutSeconds = client.getInt("timeoutSeconds", if (clientKind == "fake") 0 else 60),
                 maxRetries = client.getInt("maxRetries", if (clientKind == "fake") 0 else 2),
                 extraHeaders = stringMap(client.get("extraHeaders")),
-                transcriptPath = client.getString("transcriptPath", null)
+                transcriptPath = client.getString("transcriptPath", null),
+                useTools = client.getBoolean("useTools", true)
             ),
             request = LlmRequestConfig(
                 temperature = request?.getDouble("temperature", 0.0) ?: 0.0,
@@ -60,7 +61,7 @@ class LlmAgentConfigLoader {
                 require(!config.client.model.isNullOrBlank()) { "anthropic client requires model" }
             }
             "openai-compat" -> {
-                require(!config.client.apiKeyEnv.isNullOrBlank()) { "openai-compat client requires apiKeyEnv" }
+                // apiKeyEnv is optional: self-hosted servers (vLLM, Ollama, llama.cpp) usually need no key
                 require(!config.client.model.isNullOrBlank()) { "openai-compat client requires model" }
                 require(!config.client.baseUrl.isNullOrBlank()) { "openai-compat client requires baseUrl" }
             }

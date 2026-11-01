@@ -12,11 +12,13 @@ class LlmResponseParser {
             parseCandidate(toolJson, observation, ParsePath.TOOL_CALL)?.let { return it }
         }
 
-        for (block in fencedJsonBlocks(response.rawText)) {
+        // Reasoning models (DeepSeek-R1 and the like) may put <think>...</think> before the answer
+        val text = response.rawText.replace(THINK_BLOCK, "").substringAfter("</think>")
+        for (block in fencedJsonBlocks(text)) {
             parseCandidate(block, observation, ParsePath.FENCED_JSON)?.let { return it }
         }
 
-        balancedTopLevelObject(response.rawText)?.let { objectJson ->
+        balancedTopLevelObject(text)?.let { objectJson ->
             parseCandidate(objectJson, observation, ParsePath.BALANCED_JSON)?.let { return it }
         }
 
@@ -84,6 +86,10 @@ class LlmResponseParser {
             }
         }
         return null
+    }
+
+    private companion object {
+        val THINK_BLOCK = Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL)
     }
 
     enum class ParsePath {

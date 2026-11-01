@@ -145,7 +145,7 @@ object LlmGatewayCli {
             listOf(LlmLegalAction.EndTurn())
     }
 
-    private fun resolveInputFile(path: String): File {
+    fun resolveInputFile(path: String): File {
         val direct = File(path)
         if (direct.exists() || direct.isAbsolute) return direct
         val cwd = File(System.getProperty("user.dir"))
@@ -156,7 +156,7 @@ object LlmGatewayCli {
         return direct
     }
 
-    private fun repoRootForConfig(configFile: File): File {
+    fun repoRootForConfig(configFile: File): File {
         val absolute = configFile.absoluteFile
         return absolute.parentFile?.parentFile?.parentFile ?: File(".")
     }
