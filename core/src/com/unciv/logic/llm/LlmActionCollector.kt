@@ -164,7 +164,7 @@ class LlmActionCollector {
             else ceil(cultureNeeded / culturePerTurn).toInt().coerceAtLeast(1)
         val center = city.getCenterTile()
         val nearestForeignCity = gameInfo.getCities()
-            .filter { it.civ != civ }
+            .filter { it.civ != civ && civ.hasExplored(it.getCenterTile()) }
             .minWithOrNull(
                 compareBy<City> { it.getCenterTile().aerialDistanceTo(center) }
                     .thenBy { it.civ.civName }

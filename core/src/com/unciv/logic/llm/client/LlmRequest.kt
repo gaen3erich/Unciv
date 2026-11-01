@@ -6,7 +6,9 @@ data class LlmRequest(
     val messages: List<LlmMessage>,
     val toolSchema: String?,
     val maxTokens: Int,
-    val temperature: Double
+    val temperature: Double,
+    /** Ask the provider to cache the stable prefix (tools + system prompt). */
+    val cacheSystemPrompt: Boolean = false
 )
 
 enum class LlmRequestKind {
