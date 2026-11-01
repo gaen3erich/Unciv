@@ -1,5 +1,7 @@
 package com.unciv.ui.screens.devconsole
 
+import com.unciv.logic.automation.AiFeature
+import com.unciv.logic.automation.AiProfile
 import com.unciv.logic.civilization.PlayerType
 import com.unciv.models.ruleset.Policy
 import com.unciv.models.ruleset.tech.Technology
@@ -27,6 +29,19 @@ internal class ConsoleCivCommands : ConsoleCommandNode {
                 throw ConsoleErrorException("Can only change player type for major civs")
             civ.playerType = params[1].enumValue<PlayerType>()
             DevConsoleResponse.OK
+        },
+
+        "aiprofile" to ConsoleAction("civ aiprofile <civName> [profile]") { console, params ->
+            val civ = console.getCivByName(params[0])
+            if (params.size < 2 || params[1].isEmpty())
+                return@ConsoleAction DevConsoleResponse.hint("${civ.civID}: ${civ.aiProfile} (${civ.aiProfile.features.joinToString().ifEmpty { "no features" }}). " +
+                    "Available features: ${AiFeature.entries.joinToString { it.name }}")
+            civ.aiProfile = try {
+                AiProfile.parse(params[1].originalUnquoted())
+            } catch (ex: IllegalArgumentException) {
+                throw ConsoleErrorException(ex.message ?: "Invalid profile")
+            }
+            DevConsoleResponse.hint("${civ.civID} now plays with: ${civ.aiProfile.features.joinToString().ifEmpty { "no features" }}")
         },
 
         "revealmap" to ConsoleAction("civ revealmap [civName]") { console, params ->

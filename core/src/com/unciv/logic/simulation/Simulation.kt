@@ -1,7 +1,6 @@
 package com.unciv.logic.simulation
 
 import com.unciv.Constants
-import com.unciv.UncivGame
 import com.unciv.logic.GameInfo
 import com.unciv.logic.GameStarter
 import com.unciv.logic.automation.Timers
@@ -22,8 +21,11 @@ class Simulation(
     val simulationsPerThread: Int = 1,
     private val threadsNumber: Int = 1,
     private val maxTurns: Int = 500,
-    private val statTurns: List<Int> = listOf()
+    private val statTurns: List<Int> = listOf(),
+    /** Map seeds, used round-robin. Empty = a new random map every game */
+    private val mapSeeds: List<Long> = listOf()
 ) {
+    private val gameCounter = java.util.concurrent.atomic.AtomicInteger(0)
     private val maxSimulations = threadsNumber * simulationsPerThread
     private val majorCivs = newGameInfo.civilizations.filter { !it.isSpectator() && it.isMajorCiv() }.map { it.civID }
     private val numMajorCivs = newGameInfo.civilizations.filter { !it.isSpectator() && it.isMajorCiv()  }.size
@@ -55,10 +57,10 @@ class Simulation(
         for (civ in majorCivs) {
             this.numWins[civ] = MutableInt(0)
             winRateByVictory[civ] = mutableMapOf()
-            for (victory in UncivGame.Current.gameInfo!!.ruleset.victories.keys)
+            for (victory in newGameInfo.ruleset.victories.keys)
                 winRateByVictory[civ]!![victory] = MutableInt(0)
             winTurnByVictory[civ] = mutableMapOf()
-            for (victory in UncivGame.Current.gameInfo!!.ruleset.victories.keys)
+            for (victory in newGameInfo.ruleset.victories.keys)
                 winTurnByVictory[civ]!![victory] = MutableInt(0)
         }
         initHash(summaryStatsPop)
@@ -99,8 +101,11 @@ class Simulation(
                 repeat(simulationsPerThread) {
                     val step = SimulationStep(newGameInfo, statTurns)
                     val gameSetupInfo = GameSetupInfo(newGameInfo)
-                    gameSetupInfo.mapParameters.seed = 0
-                    val gameInfo = GameStarter.startNewGame(gameSetupInfo)
+                    val gameIndex = gameCounter.getAndIncrement()
+                    // seed 0 makes the map generator pick a time-based seed
+                    gameSetupInfo.mapParameters.seed = if (mapSeeds.isEmpty()) 0 else mapSeeds[gameIndex % mapSeeds.size]
+                    // GameStarter keeps state in an object, so only one game may be created at a time
+                    val gameInfo = synchronized(GameStarter) { GameStarter.startNewGame(gameSetupInfo) }
 
                     gameInfo.simulateUntilWin = true
 
@@ -244,13 +249,13 @@ class Simulation(
                 )
                 outString += "one-tail binomial pval = $pval\n"
             }
-            for (victory in UncivGame.Current.gameInfo!!.ruleset.victories.keys) {
+            for (victory in newGameInfo.ruleset.victories.keys) {
                 val winsVictory =
                     winRateByVictory[civ]!![victory]!!.value * 100 / max(numWins[civ]!!.value, 1)
                 outString += "$victory: $winsVictory%    "
             }
             outString += "\n"
-            for (victory in UncivGame.Current.gameInfo!!.ruleset.victories.keys) {
+            for (victory in newGameInfo.ruleset.victories.keys) {
                 val winsTurns =
                     winTurnByVictory[civ]!![victory]!!.value / max(winRateByVictory[civ]!![victory]!!.value, 1)
                 outString += "$victory: $winsTurns    "

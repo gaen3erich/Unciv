@@ -1,5 +1,6 @@
 package com.unciv.logic.automation.unit
 
+import com.unciv.logic.automation.AiFeature
 import com.unciv.Constants
 import com.unciv.UncivGame
 import com.unciv.logic.automation.Automation
@@ -537,7 +538,7 @@ object UnitAutomation {
             .firstOrNull {
                 val tile = it.currentTile
                 it.isCivilian() &&
-                        (it.hasUnique(UniqueType.FoundCity) || unit.isGreatPerson())
+                        (it.hasUnique(UniqueType.FoundCity) || escortsGreatPerson(unit, it))
                         && !it.hasUnique(UniqueType.StrengthBonusInRadius) // Exlude great generals, as they move independently after all military units
                         && (tile == unit.currentTile || tile.militaryUnit == null && unit.movement.canMoveTo(tile))
                         && distanceToTiles.containsKey(tile)
@@ -545,6 +546,14 @@ object UnitAutomation {
         unit.movement.headTowards(settlerOrGreatPersonToAccompany.currentTile)
         return true
     }
+
+    /** Whether [escort] should accompany [civilian] for being a great person.
+     *  The legacy check looks at the escort instead of the civilian, so in practice great people go unescorted;
+     *  [AiFeature.GreatPersonEscort] fixes that. */
+    @Readonly
+    private fun escortsGreatPerson(escort: MapUnit, civilian: MapUnit): Boolean =
+        if (escort.civ.aiProfile.has(AiFeature.GreatPersonEscort)) civilian.isGreatPerson()
+        else escort.isGreatPerson()
 
     private fun tryHeadTowardsOurSiegedCity(unit: MapUnit): Boolean {
         val siegedCities = unit.civ.cities

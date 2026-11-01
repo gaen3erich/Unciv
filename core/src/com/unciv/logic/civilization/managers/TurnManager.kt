@@ -358,7 +358,10 @@ class TurnManager(val civInfo: Civilization) {
             return
         timeThis("automateTurn") {
             // Do stuff
+        val startNanos = System.nanoTime()
         NextTurnAutomation.automateCivMoves(civInfo)
+        civInfo.experimentCounters.aiTurnNanos += System.nanoTime() - startNanos
+        civInfo.experimentCounters.aiTurns++
 
         // Update barbarian camps
         if (civInfo.isBarbarian && !civInfo.gameInfo.gameParameters.noBarbarians)
