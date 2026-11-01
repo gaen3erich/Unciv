@@ -48,6 +48,16 @@ tasks.register<JavaExec>("debug") {
     debug = true
 }
 
+// Headless AI-vs-AI benchmark, see AiExperimentLauncher. Pass options with --args="--candidate=... --seeds=..."
+tasks.register<JavaExec>("aiExperiment") {
+    dependsOn(tasks.getByName("classes"))
+    mainClass.set("com.unciv.app.desktop.AiExperimentLauncher")
+    classpath = sourceSets.main.get().runtimeClasspath
+    workingDir = assetsDir
+    systemProperty("aiExperimentOut", rootProject.layout.buildDirectory.dir("ai-experiment").get().asFile.absolutePath)
+    maxHeapSize = (project.findProperty("aiExperimentHeap") as String?) ?: "4g"
+}
+
 tasks.register<Jar>("dist") { // Compiles the jar file
     dependsOn(tasks.getByName("classes"))
 

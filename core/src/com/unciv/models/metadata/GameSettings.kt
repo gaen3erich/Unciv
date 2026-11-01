@@ -169,7 +169,7 @@ class GameSettings {
     //region <Methods>
 
     fun save() {
-        if (Gdx.app == null) return // Simulation mode from ConsoleLauncher
+        if (Gdx.app == null || UncivGame.Current.isConsoleMode) return // Simulation mode from ConsoleLauncher or tests
         refreshWindowSize()
         UncivGame.Current.files.setGeneralSettings(this)
     }

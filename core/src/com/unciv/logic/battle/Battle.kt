@@ -186,6 +186,8 @@ object Battle {
         attackedTile: Tile
     ) {
         if (defender.isDefeated() && defender is MapUnitCombatant && !defender.unit.isCivilian()) {
+            attacker.getCivInfo().experimentCounters.unitsKilled++
+            defender.getCivInfo().experimentCounters.unitsLost++
             tryEarnFromKilling(attacker, defender)
             tryHealAfterKilling(attacker)
 
@@ -193,6 +195,8 @@ object Battle {
             triggerDefeatUniques(defender, attacker, attackedTile)
 
         } else if (attacker.isDefeated() && attacker is MapUnitCombatant && !attacker.unit.isCivilian()) {
+            defender.getCivInfo().experimentCounters.unitsKilled++
+            attacker.getCivInfo().experimentCounters.unitsLost++
             tryEarnFromKilling(defender, attacker)
             tryHealAfterKilling(defender)
 
@@ -647,6 +651,8 @@ object Battle {
 
     private fun conquerCity(city: City, attacker: MapUnitCombatant) {
         val attackerCiv = attacker.getCivInfo()
+        attackerCiv.experimentCounters.citiesConquered++
+        city.civ.experimentCounters.citiesLost++
 
         attackerCiv.addNotification("We have conquered the city of [${city.name}]!", city.location, NotificationCategory.War, NotificationIcon.War)
 

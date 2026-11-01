@@ -1,0 +1,73 @@
+# Headless AI-vs-AI benchmark: a candidate AI profile plays against the baseline inside the same games.
+# Too slow for every PR, so it runs on demand and nightly. See docs/Other/AI-experiments.md
+name: AI experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: 'Candidate AI profile, e.g. default+GreatPersonEscort'
+        default: 'all'
+      baseline:
+        description: 'Baseline AI profile'
+        default: 'default'
+      civs:
+        description: 'Major civs per game (even, 2 = duel)'
+        default: '2'
+      seeds:
+        description: 'Map seeds; each is played twice with sides swapped'
+        default: '50'
+      max_turns:
+        description: 'Draw after this many turns'
+        default: '400'
+  schedule:
+    - cron: '0 2 * * *'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  experiment:
+    # Forks get the nightly run only if they opt in by enabling Actions; the job itself is harmless
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        # Nightly: duel and a 4-civ free-for-all. Manual runs use the civs input only.
+        civs: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('[{0}]', inputs.civs)) || fromJSON('[2, 4]') }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          cache: 'gradle'
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Run AI experiment
+        env:
+          CANDIDATE: ${{ inputs.candidate || 'all' }}
+          BASELINE: ${{ inputs.baseline || 'default' }}
+          CIVS: ${{ matrix.civs }}
+          SEEDS: ${{ inputs.seeds || '50' }}
+          MAX_TURNS: ${{ inputs.max_turns || '400' }}
+        run: |
+          ./gradlew :desktop:aiExperiment --args="--candidate=$CANDIDATE --baseline=$BASELINE --civs=$CIVS \
+            --seeds=$SEEDS --max-turns=$MAX_TURNS --out=$GITHUB_WORKSPACE/ai-experiment-${CIVS}civs"
+
+      - name: Publish report
+        if: always()
+        run: cat ai-experiment-${{ matrix.civs }}civs/report.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-experiment-${{ matrix.civs }}civs
+          path: ai-experiment-${{ matrix.civs }}civs/

@@ -4,9 +4,11 @@ import com.unciv.Constants
 import com.unciv.UncivGame
 import com.unciv.json.LastSeenImprovement
 import com.unciv.logic.*
+import com.unciv.logic.automation.AiProfile
 import com.unciv.logic.automation.unit.WorkerAutomation
 import com.unciv.logic.city.City
 import com.unciv.logic.city.managers.CityFounder
+import com.unciv.logic.simulation.ExperimentCounters
 import com.unciv.logic.civilization.diplomacy.*
 import com.unciv.logic.civilization.managers.*
 import com.unciv.logic.civilization.transients.CivInfoStatsForNextTurn
@@ -70,6 +72,23 @@ class Civilization : IsPartOfGameInfoSerialization {
 
     @Transient
     lateinit var gameInfo: GameInfo
+
+    /** Which switchable AI behaviours this civ uses, see [com.unciv.logic.automation.AiFeature].
+     *  Only AI experiments and the dev console set anything but the default. Saved as [aiProfileSpec]. */
+    @Transient
+    var aiProfile: AiProfile = AiProfile.DEFAULT
+        set(value) {
+            field = value
+            aiProfileSpec = if (value == AiProfile.DEFAULT) "" else value.name
+        }
+
+    /** Serialization field for [aiProfile], an [AiProfile.parse] spec; empty means default */
+    var aiProfileSpec = ""
+        private set
+
+    /** Counters collected for AI experiments; cheap enough to always keep, not saved */
+    @Transient
+    val experimentCounters = ExperimentCounters()
 
     @Transient
     lateinit var nation: Nation
@@ -279,6 +298,8 @@ class Civilization : IsPartOfGameInfoSerialization {
 
     fun clone(): Civilization {
         val toReturn = Civilization()
+        toReturn.aiProfileSpec = aiProfileSpec
+        toReturn.aiProfile = aiProfile
         toReturn.gold = gold
         toReturn.playerType = playerType
         toReturn.playerId = playerId
@@ -930,6 +951,8 @@ class Civilization : IsPartOfGameInfoSerialization {
     }
 
     fun setTransients():Unit = timeThis("Civilization.setTransients") {
+        if (aiProfileSpec.isNotEmpty())
+            aiProfile = try { AiProfile.parse(aiProfileSpec) } catch (_: IllegalArgumentException) { AiProfile.DEFAULT }
         goldenAges.civInfo = this
         greatPeople.civInfo = this
         civConstructions.setTransients(civInfo = this)
