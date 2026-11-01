@@ -38,6 +38,7 @@ class AiExperimentReport(
 
     fun verdict(): String = when {
         games == 0 -> "no games finished"
+        games < MIN_GAMES_FOR_VERDICT -> "too few games for a verdict (need at least $MIN_GAMES_FOR_VERDICT)"
         score.low > 0.5 -> "candidate is stronger (95% CI above 50%)"
         score.high < 0.5 -> "candidate is weaker (95% CI below 50%)"
         else -> "no significant difference at this sample size"
@@ -122,6 +123,8 @@ class AiExperimentReport(
 
     companion object {
         private const val Z95 = 1.959964
+        /** Below this the normal approximation behind the confidence interval is unreliable */
+        const val MIN_GAMES_FOR_VERDICT = 20
 
         private fun fmt(value: Double) = "%.2f".format(Locale.ROOT, value)
 
