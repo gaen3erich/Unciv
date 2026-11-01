@@ -1,5 +1,6 @@
 package com.unciv.logic.battle
 
+import com.unciv.logic.automation.civilization.strategy.StrategicPlanner
 import com.unciv.Constants
 import com.unciv.UncivGame
 import com.unciv.logic.automation.civilization.NextTurnAutomation
@@ -186,8 +187,8 @@ object Battle {
         attackedTile: Tile
     ) {
         if (defender.isDefeated() && defender is MapUnitCombatant && !defender.unit.isCivilian()) {
-            attacker.getCivInfo().experimentCounters.unitsKilled++
-            defender.getCivInfo().experimentCounters.unitsLost++
+            attacker.getCivInfo().let { it.experimentCounters.unitKilled(StrategicPlanner.activePlan(it)?.phase) }
+            defender.getCivInfo().let { it.experimentCounters.unitLost(StrategicPlanner.activePlan(it)?.phase, attacking = false) }
             tryEarnFromKilling(attacker, defender)
             tryHealAfterKilling(attacker)
 
@@ -195,8 +196,8 @@ object Battle {
             triggerDefeatUniques(defender, attacker, attackedTile)
 
         } else if (attacker.isDefeated() && attacker is MapUnitCombatant && !attacker.unit.isCivilian()) {
-            defender.getCivInfo().experimentCounters.unitsKilled++
-            attacker.getCivInfo().experimentCounters.unitsLost++
+            defender.getCivInfo().let { it.experimentCounters.unitKilled(StrategicPlanner.activePlan(it)?.phase) }
+            attacker.getCivInfo().let { it.experimentCounters.unitLost(StrategicPlanner.activePlan(it)?.phase, attacking = true) }
             tryEarnFromKilling(defender, attacker)
             tryHealAfterKilling(defender)
 

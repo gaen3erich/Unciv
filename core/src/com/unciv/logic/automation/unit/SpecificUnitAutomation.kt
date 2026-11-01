@@ -1,5 +1,6 @@
 package com.unciv.logic.automation.unit
 
+import com.unciv.logic.automation.civilization.strategy.StrategicPlanner
 import com.unciv.logic.automation.Automation
 import com.unciv.logic.automation.unit.CivilianUnitAutomation.tryRunAwayIfNeccessary
 import com.unciv.logic.battle.GreatGeneralImplementation
@@ -106,8 +107,14 @@ object SpecificUnitAutomation {
         }
 
 
+        // The strategic plan already picked a spot, comparing all free land near our cities: go there
+        val plannedSpot = StrategicPlanner.activePlan(unit.civ)?.settleTarget?.let { unit.civ.gameInfo.tileMap.getIfTileExistsOrNull(it.x, it.y) }
+        if (plannedSpot != null && plannedSpot.canBeSettled(unit.civ)
+                && (plannedSpot == unit.getTile() || plannedSpot !in dangerousTiles && unit.movement.canReach(plannedSpot)))
+            bestCityLocation = plannedSpot
+
         // If the tile we are currently on is close to the best tile, then lets just settle here instead
-        if (bestTilesInfo.tileRankMap.containsKey(unit.getTile())
+        if (bestCityLocation == null && bestTilesInfo.tileRankMap.containsKey(unit.getTile())
                 && (bestTilesInfo.bestTile == null || bestTilesInfo.tileRankMap[unit.getTile()]!! >= bestTilesInfo.bestTileRank - 2)) {
                 bestCityLocation = unit.getTile()
         }
