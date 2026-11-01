@@ -89,6 +89,8 @@ object UnitAutomation {
         // if there is an attackable unit in the vicinity, attack!
         if (tryAttacking(unit)) return
 
+        if (TacticalAutomation.isActive(unit) && TacticalAutomation.tryEscapeDeadlyTile(unit)) return
+
         if (tryTakeBackCapturedCity(unit)) return
 
         // Focus all units without a specific target on the enemy city closest to one of our cities
@@ -490,7 +492,8 @@ object UnitAutomation {
             .minByOrNull { it.tileToAttack.aerialDistanceTo(unit.getTile()) }
 
         if (closeEnemy != null) {
-            unit.movement.headTowards(closeEnemy.tileToAttackFrom)
+            if (TacticalAutomation.isActive(unit)) TacticalAutomation.headTowardsSafely(unit, closeEnemy.tileToAttackFrom)
+            else unit.movement.headTowards(closeEnemy.tileToAttackFrom)
             return true
         }
         return false

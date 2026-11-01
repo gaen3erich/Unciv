@@ -30,6 +30,10 @@ object BattleHelper {
                     // For mounted units it is fine to attack from these tiles, but with current AI movement logic it is not easy to determine if our unit can meaningfully move away after attacking
                     // Also, AI doesn't build tactical roads
             }
+            .filter {
+                if (!TacticalAutomation.isActive(unit) || TacticalAutomation.isAttackSafeEnough(unit, it)) true
+                else { unit.civ.experimentCounters.tacticalAttacksSkipped++; false }
+            }
 
         val enemyTileToAttack = chooseAttackTarget(unit, attackableEnemies)
 

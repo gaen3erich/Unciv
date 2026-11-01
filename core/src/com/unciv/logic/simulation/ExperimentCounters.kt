@@ -15,4 +15,13 @@ class ExperimentCounters {
     /** Wall-clock time spent in this civ's AI automation, nanoseconds */
     var aiTurnNanos = 0L
     var aiTurns = 0
+
+    /** [com.unciv.logic.automation.AiFeature.UnitTactics]: attack options dropped as too dangerous */
+    var tacticalAttacksSkipped = 0
+    /** UnitTactics: units that stepped off a tile where they would probably have been killed */
+    var tacticalEscapes = 0
+    /** UnitTactics: advances that stopped short of a deadly tile */
+    var tacticalStops = 0
+    /** UnitTactics: approaches to an enemy city held back for lack of local superiority */
+    var tacticalStagingHolds = 0
 }

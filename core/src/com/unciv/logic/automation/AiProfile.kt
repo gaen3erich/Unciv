@@ -16,6 +16,7 @@ import yairm210.purity.annotations.Readonly
  */
 enum class AiFeature(val enabledByDefault: Boolean, val description: String) {
     GreatPersonEscort(false, "Military units escort great people, not only settlers"),
+    UnitTactics(false, "Threat map of enemy damage next turn: no suicidal attacks, step off deadly tiles, stop short when advancing, close in on cities only with local superiority"),
     ;
 
     companion object {

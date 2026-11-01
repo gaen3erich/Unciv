@@ -77,7 +77,7 @@ object HeadTowardsEnemyCityAutomation {
             // Even in the worst case of only being able to move 1 tile per turn, we would still
             // not overshoot.
             && shortestPath.size > minDistanceFromCityToConsiderForLandingArea ) {
-            unit.movement.moveToTile(nextTileInPath)
+            moveAlongPath(unit, nextTileInPath, closestReachableEnemyCity)
             return true
         }
 
@@ -87,13 +87,22 @@ object HeadTowardsEnemyCityAutomation {
 
         val city = closestReachableEnemyCity.getCity()!!
 
-        if (cannotTakeCitySoon(ourUnitsAroundEnemyCity, city)) {
+        if (cannotTakeCitySoon(ourUnitsAroundEnemyCity, city))
+            return headToLandingGrounds(closestReachableEnemyCity, unit)
+        if (TacticalAutomation.isActive(unit) && !TacticalAutomation.hasLocalSuperiority(unit, city)) {
+            unit.civ.experimentCounters.tacticalStagingHolds++
             return headToLandingGrounds(closestReachableEnemyCity, unit)
         }
 
-        unit.movement.moveToTile(nextTileInPath) // go for it!
+        // go for it! With UnitTactics we only get here with local superiority, so the risk is accepted
+        unit.movement.moveToTile(nextTileInPath)
 
         return true
+    }
+
+    private fun moveAlongPath(unit: MapUnit, nextTileInPath: Tile, destination: Tile) {
+        if (TacticalAutomation.isActive(unit)) TacticalAutomation.headTowardsSafely(unit, destination, nextTileInPath)
+        else unit.movement.moveToTile(nextTileInPath)
     }
 
     /** Cannot take within 5 turns */
@@ -117,11 +126,13 @@ object HeadTowardsEnemyCityAutomation {
         // this is against tha AI's brilliant plan of having everyone embarked and attacking via sea when unnecessary.
         val tileToHeadTo = closestReachableEnemyCity.getTilesInDistanceRange(minDistanceFromCityToConsiderForLandingArea..maxDistanceFromCityToConsiderForLandingArea)
             .filter { it.isLand && unit.getDamageFromTerrain(it) <= 0 } // Don't head for hurty terrain
+            .filter { !TacticalAutomation.isActive(unit) || !TacticalThreatMap.of(unit.civ).isDeadly(unit, it) }
             .sortedBy { it.aerialDistanceTo(unit.currentTile) }
             .firstOrNull { (unit.movement.canMoveTo(it) || it == unit.currentTile) && unit.movement.canReach(it) }
 
         if (tileToHeadTo != null) { // no need to worry, keep going as the movement alg. says
-            unit.movement.headTowards(tileToHeadTo)
+            if (TacticalAutomation.isActive(unit)) TacticalAutomation.headTowardsSafely(unit, tileToHeadTo)
+            else unit.movement.headTowards(tileToHeadTo)
         }
         return true
     }
@@ -142,6 +153,7 @@ object HeadTowardsEnemyCityAutomation {
             it.key.aerialDistanceTo(closestReachableEnemyCity) >= unitRange
                 && it.key !in tilesInBombardRange
                 && unit.getDamageFromTerrain(it.key) <= 0 // Don't set up on a mountain 
+                && (!TacticalAutomation.isActive(unit) || !TacticalThreatMap.of(unit.civ).isDeadly(unit, it.key))
                 // Avoid mountains in path because unitDistanceToTiles parameter doesn't exclude them due to getMovementToTilesAtPosition
                 && unit.movement.canMoveTo(it.key)
         }
