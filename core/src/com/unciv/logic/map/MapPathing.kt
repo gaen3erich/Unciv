@@ -1,5 +1,6 @@
 package com.unciv.logic.map
 
+import com.unciv.UncivGame
 import com.unciv.logic.civilization.Civilization
 import com.unciv.logic.map.mapunit.MapUnit
 import com.unciv.logic.map.tile.Tile
@@ -8,6 +9,17 @@ import yairm210.purity.annotations.Readonly
 
 //TODO: Eventually, all path generation in the game should be moved into here.
 object MapPathing {
+
+    /**
+     * Whether pathing for [civ] uses the experimental A* implementation.
+     *
+     * That is a local client setting, so only human civs use it: their moves are made on their own client.
+     * AI civs always use the classic pathing, so AI decisions don't depend on the settings
+     * of whichever machine happens to run the AI turn (multiplayer, simulations).
+     */
+    @Readonly @Suppress("purity")
+    fun useAStarPathfinding(civ: Civilization): Boolean =
+        civ.isHuman() && UncivGame.isCurrentInitialized() && UncivGame.Current.settings.useAStarPathfinding
 
     /**
      * We prefer the worker to prioritize paths connected by existing roads. If a tile has a road, but the civ has the ability
