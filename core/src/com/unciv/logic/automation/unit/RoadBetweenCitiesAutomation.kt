@@ -139,7 +139,7 @@ class RoadBetweenCitiesAutomation(val civInfo: Civilization, private val cachedF
             // Try to build a plan for the road to the city
             // TODO: May return inconsistent paths across turns due to worker position, this makes it impossible to plan an exact road resulting in excessive roads built
             val roadPath = 
-                if (UncivGame.Current.settings.useAStarPathfinding)
+                if (MapPathing.useAStarPathfinding(civInfo))
                     city.getRoadPath(closeCity) ?: continue
                 else if (civInfo.cities.indexOf(city) < civInfo.cities.indexOf(closeCity)) 
                     MapPathing.getRoadPath(civInfo, city.getCenterTile(), closeCity.getCenterTile()) ?: continue
@@ -247,7 +247,7 @@ class RoadBetweenCitiesAutomation(val civInfo: Civilization, private val cachedF
         val isCandidateTilePredicate: (Tile) -> Boolean = { it.isLand && MapPathing.isValidRoadPathTile(city.civ, it) }
         val toConnectTile = city.getCenterTile()
         val cityTilesToSeek = HashSet(tilesOfConnectedCities)
-        if (UncivGame.Current.settings.useAStarPathfinding) {
+        if (MapPathing.useAStarPathfinding(civInfo)) {
             val pathToCity =
                 city.getRoadPathToAny(cityTilesToSeek, WorkerAutomationConst.maxBfsReachPadding)
                     ?: return null

@@ -46,7 +46,7 @@ class PathfindingTests(
         UncivGame.Current.settings.useAStarPathfinding = (pathfindingAlgorithm == AStarPathfinding)
         testGame.makeHexagonalMap(8)
         originTile = testGame.tileMap[0,0]
-        civInfo = testGame.addCiv()
+        civInfo = testGame.addCiv(isPlayer = true) // A* is a client setting that only human civs use
         for (tile in testGame.tileMap.values)
             tile.setExplored(civInfo, true)
 
