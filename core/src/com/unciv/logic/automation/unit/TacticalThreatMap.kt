@@ -92,6 +92,9 @@ class TacticalThreatMap private constructor(private val civ: Civilization) {
 
         private val cache = java.util.WeakHashMap<Civilization, TacticalThreatMap>()
 
+        /** Drops the cached map of [civ]; used for throwaway copies of the game, since a cached map keeps its civ alive */
+        fun forget(civ: Civilization) = synchronized(cache) { cache.remove(civ) }
+
         /** The current threat map of [civ], rebuilt when stale */
         @Readonly @Suppress("purity") // the cache is invisible to callers
         fun of(civ: Civilization): TacticalThreatMap = synchronized(cache) {

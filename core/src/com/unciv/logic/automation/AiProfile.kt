@@ -18,6 +18,7 @@ enum class AiFeature(val enabledByDefault: Boolean, val description: String) {
     GreatPersonEscort(false, "Military units escort great people, not only settlers"),
     UnitTactics(false, "Threat map of enemy damage next turn: no suicidal attacks, step off deadly tiles, stop short when advancing, close in on cities only with local superiority"),
     FocusFire(false, "Focus fire: attacks that kill come first, ranged units prefer targets a nearby melee unit can then finish"),
+    LlmCommander(false, "An LLM commands important battles: one call per battle with computed options, orders executed in sequence, fallback to the regular AI. Configured with UNCIV_COMMANDER_* settings (no endpoint: a stub model)"),
     ;
 
     companion object {

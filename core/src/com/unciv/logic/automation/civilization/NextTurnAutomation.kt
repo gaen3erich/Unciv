@@ -4,6 +4,7 @@ import com.unciv.UncivGame
 import com.unciv.logic.automation.Automation
 import com.unciv.logic.automation.ThreatLevel
 import com.unciv.logic.automation.Timers.Companion.timeThis
+import com.unciv.logic.automation.commander.TacticalCommander
 import com.unciv.logic.automation.unit.CivilianUnitAutomation
 import com.unciv.logic.automation.unit.EspionageAutomation
 import com.unciv.logic.automation.unit.UnitAutomation
@@ -453,18 +454,22 @@ object NextTurnAutomation {
 
         if (civInfo.cities.isNotEmpty()) automateSettlerEscorting(civInfo)
         
-        for (city in citiesRequiringManualPlacement) automateCityConquer(civInfo, city)
-        
+        // LlmCommander: the model commands important battles first; units it gave orders to are not moved again
+        val commanded = if (TacticalCommander.isActive(civInfo)) TacticalCommander.commandBattles(civInfo) else emptySet()
+
+        for (city in citiesRequiringManualPlacement) automateCityConquer(civInfo, city, commanded)
+
         for (unit in sortedUnits) {
+            if (unit.id in commanded) continue
             // spaceship parts and settlers have already moved
             if (!unit.hasUnique(UniqueType.SpaceshipPart) && !unit.hasUnique(UniqueType.FoundCity)) UnitAutomation.automateUnitMoves(unit)
         }
     }
     
     /** All units will continue after this to the regular automation, so units not moved in this function will still move */
-    private fun automateCityConquer(civInfo: Civilization, city: City){
+    private fun automateCityConquer(civInfo: Civilization, city: City, skipUnitIds: Set<Int> = emptySet()){
         @Readonly fun ourUnitsInRange(range: Int) = city.getCenterTile().getTilesInDistance(range)
-            .mapNotNull { it.militaryUnit }.filter { it.civ == civInfo && (!it.baseUnit.isMelee() || it.health > 30) }.toList()
+            .mapNotNull { it.militaryUnit }.filter { it.civ == civInfo && it.id !in skipUnitIds && (!it.baseUnit.isMelee() || it.health > 30) }.toList()
         
         
         fun attackIfPossible(unit: MapUnit, tile: Tile){
