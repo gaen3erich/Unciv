@@ -3,6 +3,7 @@ package com.unciv.logic.civilization.managers
 import com.unciv.UncivGame
 import com.unciv.logic.VictoryData
 import com.unciv.logic.automation.civilization.NextTurnAutomation
+import com.unciv.logic.llm.ingame.LlmInGameAgent
 import com.unciv.logic.city.managers.CityTurnManager
 import com.unciv.logic.civilization.*
 import com.unciv.logic.civilization.diplomacy.DiplomacyTurnManager.nextTurn
@@ -359,7 +360,9 @@ class TurnManager(val civInfo: Civilization) {
         timeThis("automateTurn") {
             // Do stuff
         val startNanos = System.nanoTime()
-        NextTurnAutomation.automateCivMoves(civInfo)
+        val llmController = LlmInGameAgent.controller
+        if (llmController != null && llmController.controls(civInfo)) llmController.playTurn(civInfo)
+        else NextTurnAutomation.automateCivMoves(civInfo)
         civInfo.experimentCounters.aiTurnNanos += System.nanoTime() - startNanos
         civInfo.experimentCounters.aiTurns++
 

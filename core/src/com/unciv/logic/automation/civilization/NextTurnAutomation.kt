@@ -104,6 +104,28 @@ object NextTurnAutomation {
         tryVoteForDiplomaticVictory(civInfo)
     }
 
+    /**
+     * The part of the AI turn that an external agent (the in-game LLM agent) does not decide itself:
+     * answering popups and trade requests, policies, religion, spies, city bombardment, voting.
+     * Research and city production are only filled in when the agent left them empty.
+     * War, peace, constructions, research and units stay with the agent.
+     */
+    fun automateHousekeepingForExternalAgent(civInfo: Civilization) {
+        respondToPopupAlerts(civInfo)
+        TradeAutomation.respondToTradeRequests(civInfo, true)
+        if (civInfo.gameInfo.isReligionEnabled()) {
+            ReligionAutomation.spendFaithOnReligion(civInfo)
+            ReligionAutomation.chooseReligiousBeliefs(civInfo)
+        }
+        adoptPolicy(civInfo)
+        freeUpSpaceResources(civInfo)
+        chooseTechToResearch(civInfo)
+        automateCityBombardment(civInfo)
+        if (civInfo.gameInfo.isEspionageEnabled()) EspionageAutomation(civInfo).automateSpies()
+        for (city in civInfo.cities) city.cityConstructions.chooseNextConstruction()
+        tryVoteForDiplomaticVictory(civInfo)
+    }
+
     fun automateGoldToSciencePercentage(civInfo: Civilization) {
         // Don't let the AI run blindly with the default convert-gold-to-science ratio if that option is enabled
         val estimatedIncome = civInfo.stats.statsForNextTurn.gold.toInt()

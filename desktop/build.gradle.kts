@@ -58,6 +58,15 @@ tasks.register<JavaExec>("aiExperiment") {
     maxHeapSize = (project.findProperty("aiExperimentHeap") as String?) ?: "4g"
 }
 
+tasks.register<JavaExec>("llmGatewayCli") {
+    dependsOn(tasks.getByName("classes"))
+    mainClass.set("com.unciv.app.desktop.LlmGatewayCli")
+    classpath = sourceSets.main.get().runtimeClasspath
+    workingDir = assetsDir
+    standardInput = System.`in`
+    isIgnoreExitValue = false
+}
+
 tasks.register<Jar>("dist") { // Compiles the jar file
     dependsOn(tasks.getByName("classes"))
 
