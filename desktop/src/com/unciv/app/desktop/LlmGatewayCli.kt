@@ -1,5 +1,7 @@
 package com.unciv.app.desktop
 
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Files
 import com.unciv.UncivGame
 import com.unciv.app.desktop.llm.DesktopLlmPolicyFactory
 import com.unciv.logic.files.IncompatibleGameInfoVersionException
@@ -41,6 +43,10 @@ object LlmGatewayCli {
             // gameInfoFromString calls setTransients(); this CLI relies on that loader contract.
             val gameInfo = UncivFiles.gameInfoFromString(saveFile.readText(Charsets.UTF_8))
             UncivGame.Current.gameInfo = gameInfo
+            // The agent's civ counts as a player, so PlaySound triggers (ancient ruins) look up sound files.
+            // Set only after loading: Ruleset.load treats Gdx.files == null as console mode.
+            Gdx.files = Lwjgl3Files()
+            UncivGame.Current.files = UncivFiles(Gdx.files)
             val policy = policyFor(config)
             outputFile.parentFile?.mkdirs()
 

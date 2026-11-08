@@ -6,7 +6,9 @@ import com.unciv.logic.llm.LlmGateway
 import com.unciv.logic.llm.LlmGatewayTestFixtures
 import com.unciv.logic.llm.LlmLegalAction
 import com.unciv.logic.llm.LlmObservationVersion
+import com.unciv.logic.llm.RandomPolicySmokeTests
 import com.unciv.logic.llm.ScriptedPolicy
+import com.unciv.logic.llm.policy.LlmCallTrace
 import com.unciv.testing.GdxTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -88,6 +90,42 @@ class LlmJsonCodecTests {
         assertEquals(1, json.get("selectedActions").size)
         assertEquals("ChooseTechnology", json.get("selectedActions").get(0).getString("kind"))
         assertTrue(json.get("appliedActions").size <= 1)
+    }
+
+    @Test
+    fun `trace record carries the failure reason and rejected response of an llm call`() {
+        val call = LlmCallTrace(
+            clientId = "fake",
+            requestKind = "DECISION",
+            systemPromptHash = "s",
+            userPromptHash = "u",
+            inputTokens = 1,
+            outputTokens = 1,
+            cacheReadTokens = 0,
+            latencyMs = 1,
+            stopReason = "stop",
+            parsedSuccessfully = false,
+            parsePath = "TOOL_CALL",
+            fallbackUsed = "parse_failure",
+            failureReason = "Action id is not legal in current observation: bad",
+            failedResponse = """{"actions":[{"id":"bad"}]}"""
+        )
+        val record = LlmTraceRecord(
+            step = 0,
+            createdAt = "2026-01-01T00:00:00Z",
+            turn = 1,
+            civId = "Rome",
+            observation = RandomPolicySmokeTests.observationWithLegalActionsForTests(LlmLegalAction.EndTurn()),
+            selectedActions = emptyList(),
+            appliedActions = emptyList(),
+            rejectedActions = emptyList(),
+            llmCall = call
+        )
+
+        val llmCall = parse(codec.encodeTraceRecord(record)).get("llmCall")
+
+        assertEquals("Action id is not legal in current observation: bad", llmCall.getString("failureReason"))
+        assertEquals("""{"actions":[{"id":"bad"}]}""", llmCall.getString("failedResponse"))
     }
 
     private fun parse(json: String) = JsonReader().parse(json)

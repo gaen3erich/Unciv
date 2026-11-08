@@ -20,6 +20,8 @@ internal class DesktopLlmHttp(
 ) {
     private val timeout = Duration.ofSeconds(max(1, timeoutSeconds).toLong())
     private val client = HttpClient.newBuilder()
+        // The default HTTP/2 upgrade (h2c) on cleartext endpoints makes uvicorn/vLLM lose the POST body
+        .version(HttpClient.Version.HTTP_1_1)
         .connectTimeout(timeout)
         .build()
 

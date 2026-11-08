@@ -367,7 +367,9 @@ class LlmJsonCodec {
         rawField("notes", trace.notes?.let { quote(it) } ?: "null"),
         rawField("userPromptChars", trace.userPromptChars.toString()),
         rawField("systemPrompt", trace.systemPrompt?.let { quote(it) } ?: "null"),
-        rawField("userPrompt", trace.userPrompt?.let { quote(it) } ?: "null")
+        rawField("userPrompt", trace.userPrompt?.let { quote(it) } ?: "null"),
+        rawField("failureReason", trace.failureReason?.let { quote(it) } ?: "null"),
+        rawField("failedResponse", trace.failedResponse?.let { quote(it) } ?: "null")
     )
 
     private fun field(name: String, value: String) = rawField(name, quote(value))

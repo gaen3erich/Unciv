@@ -51,7 +51,11 @@ class RealLlmPolicy(
                 result.actions
             }
             is LlmResponseParser.ParseResult.Failure -> {
-                lastTrace = traceForResponse(request.systemPrompt, userPrompt, request.kind.name, response, false, result.parsePath.name, "parse_failure", null)
+                lastTrace = traceForResponse(
+                    request.systemPrompt, userPrompt, request.kind.name, response, false, result.parsePath.name, "parse_failure", null,
+                    failureReason = result.reason,
+                    failedResponse = result.rawResponse
+                )
                 fallback.onParseFailure(observation, response, result.reason)
             }
         }
@@ -79,7 +83,8 @@ class RealLlmPolicy(
             fallbackUsed = "client_error",
             userPromptChars = userPrompt.length,
             systemPrompt = if (includePrompts) systemPrompt else null,
-            userPrompt = if (includePrompts) userPrompt else null
+            userPrompt = if (includePrompts) userPrompt else null,
+            failureReason = e.message ?: e::class.simpleName
         )
 
     private fun traceForResponse(
@@ -91,7 +96,9 @@ class RealLlmPolicy(
         parsePath: String,
         fallbackUsed: String?,
         rationale: String?,
-        notes: String? = null
+        notes: String? = null,
+        failureReason: String? = null,
+        failedResponse: String? = null
     ) = LlmCallTrace(
         clientId = client.identifier,
         requestKind = kind,
@@ -109,11 +116,17 @@ class RealLlmPolicy(
         notes = notes,
         userPromptChars = userPrompt.length,
         systemPrompt = if (includePrompts) systemPrompt else null,
-        userPrompt = if (includePrompts) userPrompt else null
+        userPrompt = if (includePrompts) userPrompt else null,
+        failureReason = failureReason,
+        failedResponse = if (includePrompts) failedResponse?.take(FAILED_RESPONSE_MAX_CHARS) else null
     )
 
     private fun sha256Prefix(text: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }.take(16)
+    }
+
+    private companion object {
+        const val FAILED_RESPONSE_MAX_CHARS = 4000
     }
 }
