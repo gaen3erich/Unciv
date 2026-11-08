@@ -1,0 +1,16 @@
+{
+  "schema": "llm-agent-config/v1",
+  "name": "deepseek-ssh",
+  "description": "Self-hosted DeepSeek behind an OpenAI-compatible server (vLLM, SGLang, Ollama, llama.cpp), reached through an ssh tunnel to localhost:8000. Set model to the name the server reports at /v1/models. Set useTools to false if the server rejects tools/tool_choice.",
+  "client": {
+    "kind": "openai-compat",
+    "model": "deepseek-ai/DeepSeek-V3",
+    "baseUrl": "http://localhost:8000/v1",
+    "useTools": true,
+    "timeoutSeconds": 300,
+    "maxRetries": 1
+  },
+  "request": { "temperature": 0.2, "maxTokens": 4096 },
+  "policy": { "kind": "llm", "fallback": "end_turn_only", "failOnLlmErrorAfterConsecutive": 5 },
+  "trace": { "includePrompts": true, "includeRationale": true }
+}
