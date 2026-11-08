@@ -3,6 +3,7 @@ package com.unciv.app.desktop
 import com.unciv.UncivGame
 import com.unciv.logic.automation.AiFeature
 import com.unciv.logic.automation.AiProfile
+import com.unciv.logic.automation.commander.TacticalCommander
 import com.unciv.logic.simulation.AiExperiment
 import com.unciv.logic.simulation.AiExperimentConfig
 import com.unciv.logic.simulation.AiExperimentReport
@@ -38,6 +39,7 @@ Options (all optional):
   --fail-if-worse          exit code 2 when the candidate is significantly weaker
 
 Profiles: default | none | all, followed by +Feature / -Feature, e.g. default+GreatPersonEscort
+LlmCommander is configured with UNCIV_COMMANDER_* environment variables, see docs/LLM_COMMANDER.md
 """
 
     @JvmStatic
@@ -75,6 +77,13 @@ Profiles: default | none | all, followed by +Feature / -Feature, e.g. default+Gr
             difficulty = options["difficulty"] ?: "King",
             mapSize = options["map-size"],
         )
+        if (config.candidate.has(AiFeature.LlmCommander) || config.baseline.has(AiFeature.LlmCommander)) {
+            val commander = TacticalCommander.config
+            println("LLM commander: " + (if (commander.usesStub) "stub model (set UNCIV_COMMANDER_BASE_URL for a real one)"
+                else "${commander.model} at ${commander.baseUrl}") + ", logs in ${commander.logDirFile() ?: "nowhere"}")
+            if (!commander.usesStub && config.threads > 1)
+                println("Hint: a real model answers one battle at a time anyway, --threads=1 keeps the logs in game order")
+        }
         if (config.candidate == config.baseline)
             println("Warning: candidate and baseline have the same features, expect ~50%")
 

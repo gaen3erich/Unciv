@@ -18,6 +18,27 @@ class ExperimentCounters {
     var aiTurnNanos = 0L
     var aiTurns = 0
 
+    /** [com.unciv.logic.automation.AiFeature.UnitTactics]: attack options dropped as too dangerous */
+    var tacticalAttacksSkipped = 0
+    /** UnitTactics: units that stepped off a tile where they would probably have been killed */
+    var tacticalEscapes = 0
+    /** UnitTactics: advances that stopped short of a deadly tile */
+    var tacticalStops = 0
+    /** UnitTactics: approaches to an enemy city held back for lack of local superiority */
+    var tacticalStagingHolds = 0
+    /** [com.unciv.logic.automation.AiFeature.FocusFire]: attacks chosen because they kill or set up a kill */
+    var focusFireAttacks = 0
+
+    /** [com.unciv.logic.automation.AiFeature.LlmCommander]: battles handed to the model */
+    var commanderBattles = 0
+    /** LlmCommander: model calls, re-plans after surprises included */
+    var commanderCalls = 0
+    var commanderOrdersOk = 0
+    /** LlmCommander: orders that could not be carried out; their units fell back to the default AI */
+    var commanderOrdersFailed = 0
+    /** LlmCommander: battles where the model call or the answer failed and the default AI took over */
+    var commanderModelErrors = 0
+    var commanderProductionHints = 0
     /** Detailed strategic plan reviews, see [com.unciv.logic.automation.civilization.strategy.StrategicPlanner] */
     var strategicReviews = 0
     /** Reviews that ran because something happened, not because they were scheduled */

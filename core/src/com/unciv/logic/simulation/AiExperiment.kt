@@ -66,6 +66,19 @@ data class CivResult(
     val citiesConquered: Int,
     val citiesLost: Int,
     val aiTurnMs: Double,
+    /** UnitTactics decisions, see [ExperimentCounters] */
+    val tacticalAttacksSkipped: Int = 0,
+    val tacticalEscapes: Int = 0,
+    val tacticalStops: Int = 0,
+    val tacticalStagingHolds: Int = 0,
+    /** FocusFire decisions, see [ExperimentCounters] */
+    val focusFireAttacks: Int = 0,
+    /** LlmCommander, see [ExperimentCounters] */
+    val commanderBattles: Int = 0,
+    val commanderCalls: Int = 0,
+    val commanderOrdersOk: Int = 0,
+    val commanderOrdersFailed: Int = 0,
+    val commanderModelErrors: Int = 0,
     /** Detailed strategic plan reviews; 0 when the civ played without a plan */
     val strategicReviews: Int = 0,
     /** Of those, reviews caused by an event rather than the schedule */
@@ -242,6 +255,16 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 citiesConquered = counters.citiesConquered,
                 citiesLost = counters.citiesLost,
                 aiTurnMs = if (counters.aiTurns == 0) 0.0 else counters.aiTurnNanos / 1e6 / counters.aiTurns,
+                tacticalAttacksSkipped = counters.tacticalAttacksSkipped,
+                tacticalEscapes = counters.tacticalEscapes,
+                tacticalStops = counters.tacticalStops,
+                tacticalStagingHolds = counters.tacticalStagingHolds,
+                focusFireAttacks = counters.focusFireAttacks,
+                commanderBattles = counters.commanderBattles,
+                commanderCalls = counters.commanderCalls,
+                commanderOrdersOk = counters.commanderOrdersOk,
+                commanderOrdersFailed = counters.commanderOrdersFailed,
+                commanderModelErrors = counters.commanderModelErrors,
                 strategicReviews = counters.strategicReviews,
                 triggeredStrategicReviews = counters.triggeredStrategicReviews,
                 phaseTurns = StrategicPhase.entries.associate { it.name to counters.phaseTurns[it.ordinal] },

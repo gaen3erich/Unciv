@@ -192,3 +192,7 @@ detekt/reports.html
 /buildSrc/.kotlin/errors/*
 /buildSrc/.kotlin/sessions/*
 /.claude/
+
+# LLM tactical commander logs (docs/LLM_COMMANDER.md)
+commander-logs/
+android/assets/commander-logs/

@@ -1,6 +1,5 @@
 package com.unciv.logic.automation.unit
 
-import com.unciv.UncivGame
 import com.unciv.logic.civilization.Civilization
 import com.unciv.logic.civilization.MapUnitAction
 import com.unciv.logic.civilization.NotificationCategory
@@ -54,7 +53,7 @@ class RoadToAutomation(val civInfo: Civilization) {
         // The path does not exist, create it
         if (pathToDest == null) {
             val foundPath: List<Tile>? = 
-                if (UncivGame.Current.settings.useAStarPathfinding) unit.movement.getRoadPath(destinationTile)
+                if (MapPathing.useAStarPathfinding(unit.civ)) unit.movement.getRoadPath(destinationTile)
                 else MapPathing.getRoadPath(unit.civ, unit.getTile(), destinationTile)
             if (foundPath == null) {
                 Log.debug("WorkerAutomation: $unit -> connect road failed")
