@@ -5,6 +5,8 @@ import com.unciv.logic.automation.Automation
 import com.unciv.logic.automation.ThreatLevel
 import com.unciv.logic.automation.Timers.Companion.timeThis
 import com.unciv.logic.automation.commander.TacticalCommander
+import com.unciv.logic.automation.civilization.strategy.StrategicPhase
+import com.unciv.logic.automation.civilization.strategy.StrategicPlanner
 import com.unciv.logic.automation.unit.CivilianUnitAutomation
 import com.unciv.logic.automation.unit.EspionageAutomation
 import com.unciv.logic.automation.unit.UnitAutomation
@@ -42,6 +44,9 @@ object NextTurnAutomation {
                          tradeAndChangeState: Boolean = true): Unit = timeThis("automateCivMoves") {
         if (civInfo.isBarbarian) return BarbarianAutomation(civInfo).automate()
         if (civInfo.isSpectator()) return // When there's a spectator in multiplayer games, it's processed automatically, but shouldn't be able to actually do anything
+
+        // Cheap situation check every turn, detailed review when due or when something happened
+        StrategicPlanner.update(civInfo)
 
         respondToPopupAlerts(civInfo)
         TradeAutomation.respondToTradeRequests(civInfo, tradeAndChangeState)
@@ -252,15 +257,20 @@ object NextTurnAutomation {
         }
 
         val stateForConditionals = civInfo.state
+        // The strategic plan tilts tech choice towards what it needs (units, wonders, stats); 1 without a plan
+        val strategyMultipliers = HashMap<String, Float>()
+        fun weight(tech: Technology): Float = tech.getWeightForAiDecision(stateForConditionals) *
+            strategyMultipliers.getOrPut(tech.name) { StrategicPlanner.techMultiplier(civInfo, tech) }
+
         while (civInfo.tech.freeTechs > 0) {
             val costs = getGroupedResearchableTechs()
             if (costs.isEmpty()) return
             
             val mostExpensiveTechs = costs.lastOrNull{ 
                 // Ignore rows where all techs have 0 weight
-                it.any { it.getWeightForAiDecision(stateForConditionals) > 0 }
+                it.any { weight(it) > 0 }
             } ?: costs.last()
-            val chosenTech = mostExpensiveTechs.randomWeighted(rng) { it.getWeightForAiDecision(stateForConditionals) }
+            val chosenTech = mostExpensiveTechs.randomWeighted(rng) { weight(it) }
             civInfo.tech.getFreeTechnology(chosenTech.name)
         }
         if (civInfo.tech.techsToResearch.isEmpty()) {
@@ -269,15 +279,15 @@ object NextTurnAutomation {
 
             val cheapestTechs = costs.firstOrNull{
                 // Ignore rows where all techs have 0 weight
-                it.any { it.getWeightForAiDecision(stateForConditionals) > 0 } }?: costs.first()
+                it.any { weight(it) > 0 } }?: costs.first()
             //Do not consider advanced techs if only one tech left in cheapest group
             val techToResearch: Technology =
                 if (cheapestTechs.size == 1 || costs.size == 1) {
-                    cheapestTechs.randomWeighted(rng) { it.getWeightForAiDecision(stateForConditionals) }
+                    cheapestTechs.randomWeighted(rng) { weight(it) }
                 } else {
                     //Choose randomly between cheapest and second cheapest group
                     val techsAdvanced = costs[1]
-                    (cheapestTechs + techsAdvanced).randomWeighted(rng) { it.getWeightForAiDecision(stateForConditionals) }
+                    (cheapestTechs + techsAdvanced).randomWeighted(rng) { weight(it) }
                 }
 
             civInfo.tech.techsToResearch.add(techToResearch.name)
@@ -572,6 +582,7 @@ object NextTurnAutomation {
                     .sumOf { it.getStatForRanking(RankingType.Force) }
         val civHasSignificantlyWeakerMilitaryThanEnemies =
                 ownMilitaryStrength < sumOfEnemiesMilitaryStrength * 0.66f
+        val isDefending = StrategicPlanner.activePlan(civInfo)?.phase == StrategicPhase.Defense
         for (city in civInfo.cities) {
             if (city.isPuppet && city.population.population > 9
                     && !city.isInResistance() && !civInfo.hasUnique(UniqueType.MayNotAnnexCities)
@@ -580,7 +591,7 @@ object NextTurnAutomation {
                 city.annexCity()
             }
 
-            if (city.health < city.getMaxHealth() || civHasSignificantlyWeakerMilitaryThanEnemies) {
+            if (city.health < city.getMaxHealth() || civHasSignificantlyWeakerMilitaryThanEnemies || isDefending) {
                 Automation.tryTrainMilitaryUnit(city) // need defenses if city is under attack
                 if (city.cityConstructions.constructionQueue.isNotEmpty())
                     continue // found a unit to build so move on
@@ -595,8 +606,15 @@ object NextTurnAutomation {
         if (civInfo.isCityState) return
         if (civInfo.isOneCityChallenger()) return
         if (civInfo.cities.none()) return
-        if (civInfo.getHappiness() <= civInfo.cities.size) return
-        if (CivilianUnitAutomation.isLateGame(civInfo)) return // all suitable land should be occupied already; there will only be a risk of the settler getting bombed
+        // With a strategic plan, the plan's expansion evaluation replaces the happiness and late game rules of thumb
+        val plan = StrategicPlanner.activePlan(civInfo)
+        if (plan == null) {
+            if (civInfo.getHappiness() <= civInfo.cities.size) return
+            if (CivilianUnitAutomation.isLateGame(civInfo)) return // all suitable land should be occupied already; there will only be a risk of the settler getting bombed
+        } else {
+            if (!plan.expansionWanted) return // developing our cities pays off better, or the plan is busy with a war
+            if (StrategicPlanner.weights(civInfo).expansion <= 0.5f) return
+        }
 
         // This is a tough one - if we don't ignore conditionals we could have units that can found only on certain tiles that are ignored
         // If we DO ignore conditionals we could get a unit that can only found if there's a certain tech, or something
@@ -612,6 +630,15 @@ object NextTurnAutomation {
         if (settlerUnits.isEmpty()) return
 
         if (civInfo.units.getCivUnits().count { it.isMilitary() } < civInfo.cities.size) return // We need someone to defend them first
+
+        if (plan != null) {
+            // The plan already compared build time and distance to the target for every city
+            val builder = civInfo.cities.firstOrNull { it.id == plan.settlerBuilder }
+                ?.takeIf { !it.isPuppet && it.population.population >= 2 && !it.isInResistance() }
+                ?: return
+            builder.cityConstructions.setCurrentConstruction(settlerUnits.minByOrNull { it.cost }!!.name)
+            return
+        }
 
         val bestCity = civInfo.cities
             .filterNot { it.isPuppet || it.population.population < 3 }

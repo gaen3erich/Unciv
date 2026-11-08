@@ -1,5 +1,7 @@
 package com.unciv.logic.simulation
 
+import com.unciv.logic.automation.civilization.strategy.StrategicPhase
+
 /**
  * Per-civilization counters for AI experiments ([AiExperiment]).
  * Kept on [com.unciv.logic.civilization.Civilization] as a transient, so they are never saved.
@@ -37,4 +39,29 @@ class ExperimentCounters {
     /** LlmCommander: battles where the model call or the answer failed and the default AI took over */
     var commanderModelErrors = 0
     var commanderProductionHints = 0
+    /** Detailed strategic plan reviews, see [com.unciv.logic.automation.civilization.strategy.StrategicPlanner] */
+    var strategicReviews = 0
+    /** Reviews that ran because something happened, not because they were scheduled */
+    var triggeredStrategicReviews = 0
+    /** Turns spent in each strategic phase */
+    val phaseTurns = IntArray(StrategicPhase.entries.size)
+
+    fun countPhaseTurn(phase: StrategicPhase) { phaseTurns[phase.ordinal]++ }
+
+    /** Own military units that died attacking (the rest died defending) */
+    var unitsLostAttacking = 0
+    /** Kills and losses by the strategic phase the civ was in; only counted for civs with a plan */
+    val unitsKilledByPhase = IntArray(StrategicPhase.entries.size)
+    val unitsLostByPhase = IntArray(StrategicPhase.entries.size)
+
+    fun unitKilled(phase: StrategicPhase?) {
+        unitsKilled++
+        if (phase != null) unitsKilledByPhase[phase.ordinal]++
+    }
+
+    fun unitLost(phase: StrategicPhase?, attacking: Boolean) {
+        unitsLost++
+        if (attacking) unitsLostAttacking++
+        if (phase != null) unitsLostByPhase[phase.ordinal]++
+    }
 }

@@ -1,5 +1,7 @@
 package com.unciv.logic.automation.civilization
 
+import com.unciv.logic.automation.civilization.strategy.StrategicPlanner
+import com.unciv.UncivGame
 import com.unciv.logic.battle.BattleDamage
 import com.unciv.logic.battle.CityCombatant
 import com.unciv.logic.battle.MapUnitCombatant
@@ -126,6 +128,8 @@ object MotivationToAttackAutomation {
         modifiers += getWonderBasedMotivations(targetCiv)
 
         modifiers.add(Pair("War with allies", getAlliedWarMotivation(civInfo, targetCiv)))
+
+        modifiers.add(Pair("Strategic plan", StrategicPlanner.attackMotivationModifier(civInfo, targetCiv)))
 
         // Purely for debugging, remove modifiers that don't have an effect
         modifiers.removeAll { it.second == 0f }

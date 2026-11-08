@@ -88,6 +88,7 @@ class AiExperimentReport(
         row("Enemy units killed") { it.unitsKilled.toDouble() }
         row("Own units lost") { it.unitsLost.toDouble() }
         appendLine("| Kill / loss ratio | ${killLoss(true)} | ${killLoss(false)} |")
+        row("Own units lost while attacking, %") { if (it.unitsLost == 0) null else 100.0 * it.unitsLostAttacking / it.unitsLost }
         row("Survived to the end, %") { if (it.alive) 100.0 else 0.0 }
         if (results.any { game -> game.civs.any { it.tacticalEscapes + it.tacticalStops + it.tacticalAttacksSkipped > 0 } }) {
             row("Tactics: attack options skipped as too dangerous") { it.tacticalAttacksSkipped.toDouble() }
@@ -107,6 +108,40 @@ class AiExperimentReport(
         row("AI time per turn, ms") { it.aiTurnMs }
         appendLine()
         appendLine("Population and cities at turn N only count games that lasted that long.")
+        strategicPlanSection()
+    }
+
+    /** Only for civs that played with a strategic plan: where they spent their turns, how often they replanned */
+    private fun StringBuilder.strategicPlanSection() {
+        val planned = results.flatMap { it.civs }.filter { it.strategicReviews > 0 }
+        if (planned.isEmpty()) return
+        appendLine()
+        appendLine("## Strategic plan (civs that played with one)")
+        appendLine()
+        appendLine("| metric | candidate | baseline |")
+        appendLine("|---|---|---|")
+        fun planRow(name: String, value: (CivResult) -> Double?) {
+            fun side(candidate: Boolean) = planned.filter { it.isCandidate == candidate }
+                .mapNotNull(value).let { if (it.isEmpty()) "–" else fmt(it.average()) }
+            appendLine("| $name | ${side(true)} | ${side(false)} |")
+        }
+        val phases = planned.flatMap { it.phaseTurns.keys }.distinct()
+        for (phase in phases) planRow("Turns in $phase, %") { civ ->
+            val total = civ.phaseTurns.values.sum()
+            if (total == 0) null else 100.0 * (civ.phaseTurns[phase] ?: 0) / total
+        }
+        for (phase in phases) planRow("Units killed / lost in $phase") { civ ->
+            val lost = civ.unitsLostByPhase[phase] ?: 0
+            if (lost == 0) null else (civ.unitsKilledByPhase[phase] ?: 0).toDouble() / lost
+        }
+        for (phase in phases) planRow("Own units lost in $phase, per game") { civ -> (civ.unitsLostByPhase[phase] ?: 0).toDouble() }
+        planRow("Detailed reviews per 100 turns") { civ ->
+            val total = civ.phaseTurns.values.sum()
+            if (total == 0) null else 100.0 * civ.strategicReviews / total
+        }
+        planRow("Of those triggered by events, %") { civ ->
+            100.0 * civ.triggeredStrategicReviews / civ.strategicReviews
+        }
     }
 
     private fun StringBuilder.row(name: String, value: (CivResult) -> Double?) {
