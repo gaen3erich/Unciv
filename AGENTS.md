@@ -7,6 +7,11 @@ building, how we work, and where to find detailed guides.
 If you read only one file before starting work, read this one. Then follow
 the links below into the specific guide you need.
 
+**Working on tactical AI or the LLM battle commander** (`AiFeature.UnitTactics`,
+`FocusFire`, `LlmCommander`, `core/src/com/unciv/logic/automation/commander/`)?
+Start with `docs/TACTICAL_AI_TESTING.md` (principles, what exists, how to test,
+next steps) and `docs/LLM_COMMANDER.md` (how to run it with a model).
+
 ---
 
 ## 1. What this project is
