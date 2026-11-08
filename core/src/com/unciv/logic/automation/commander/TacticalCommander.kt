@@ -81,7 +81,7 @@ object TacticalCommander {
 
             // Execute; after a surprise (failed order, lost unit, a kill that did not happen) show the model the
             // real situation and let it re-plan the units that can still act. No peeking at outcomes in advance.
-            val executor = OrderExecutor(civ, allowed)
+            val executor = OrderExecutor(civ, allowed, digest)
             var replansLeft = cfg.replans
             logText.appendLine().appendLine("## Execution").appendLine().appendLine("```")
             while (true) {
@@ -99,6 +99,7 @@ object TacticalCommander {
                 replansLeft--
                 logText.appendLine("```")
                 val situation = BattleDigestBuilder.build(civ, current)
+                executor.menu = situation
                 // Only the current situation and the latest orders: the request must not grow with every re-plan
                 val feedback = buildString {
                     if (plan.intent.isNotBlank()) appendLine("Your plan: ${plan.intent}").appendLine()

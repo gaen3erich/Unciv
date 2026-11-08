@@ -241,7 +241,7 @@ class TacticalCommanderTests {
     }
 
     @Test
-    fun secondOrderForTheSameTileIsDroppedWithoutReplanning() {
+    fun secondOrderForTheSameTileGoesToAnotherTileOfTheMenu() {
         TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
         val free = archer.movement.getDistanceToTiles().keys.first { tile ->
             tile != archer.getTile() && tile != warrior.getTile() && tile.militaryUnit == null &&
@@ -256,8 +256,54 @@ class TacticalCommanderTests {
         val handled = TacticalCommander.commandBattles(us)
 
         assertEquals(1, model.asked.size)
-        assertEquals(setOf(archer.id), handled)
+        assertEquals(setOf(archer.id, warrior.id), handled)
         assertEquals(free, archer.getTile())
+        assertTrue(warrior.getTile() != free)
+    }
+
+    @Test
+    fun attackTheMenuNeverOfferedIsNotASurprise() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val model = ScriptedModel(
+            """{"intent": "a", "orders": [{"unit": ${warrior.id}, "action": "attack", "target": "city@6,6"},
+                {"unit": ${archer.id}, "action": "fortify"}]}""")
+        TacticalCommander.modelOverride = model
+
+        val handled = TacticalCommander.commandBattles(us)
+
+        assertEquals(1, model.asked.size)
+        assertEquals(setOf(archer.id), handled)
+    }
+
+    private fun menuWith(attacks: List<AttackOption>): BattleDigest {
+        val engagement = BattleDetector.detect(us).single()
+        return BattleDigest(us, engagement, listOf(OwnUnitDigest(warrior, 0, attacks, emptyList())), emptyList())
+    }
+
+    @Test
+    fun attackTheMenuOfferedThatIsNoLongerPossibleIsASurprise() {
+        val offered = AttackOption("city@6,6", "City", game.getTile(5, 5), 10, 0, 100, 100, 0, true)
+        val executor = OrderExecutor(us, setOf(warrior.id), menuWith(listOf(offered)))
+
+        val result = executor.execute(listOf(CommanderOrder(warrior.id, "attack", target = "city@6,6"))).single()
+
+        assertFalse(result.ok)
+        assertNotNull(result.surprise)
+    }
+
+    @Test
+    fun promptAsksForTheReasonOfAttacksAndTheParserAcceptsIt() {
+        assertTrue(CommanderPrompt.systemPrompt("Russian").contains("\"why\""))
+
+        val plan = CommanderPlanParser.parse("""{"intent": "a", "orders": [{"unit": 3, "action": "attack", "target": 7, "why": "добиваю"}]}""")
+
+        assertEquals(1, plan.orders.size)
+        assertTrue(plan.warnings.isEmpty())
+    }
+
+    @Test
+    fun menuSaysWhenAUnitHasNoAttack() {
+        assertTrue(BattleDigestBuilder.render(menuWith(emptyList())).contains("no attack available"))
     }
 
     @Test

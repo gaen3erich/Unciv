@@ -217,6 +217,8 @@ object BattleDigestBuilder {
                 (if (unit.isFortified()) ", fortified" else "") +
                 (if (unit.getTile().isCityCenter()) ", garrison (the city takes the hits)" else "") +
                 (if (!unit.canAttack() || !unit.hasMovement()) ", cannot attack this turn" else ""))
+            if (u.attacks.isEmpty() && unit.canAttack() && unit.hasMovement())
+                appendLine("  no attack available: no target in range this turn, even after moving")
             for (a in u.attacks) {
                 val outcome = when {
                     a.attackerDies -> "WE DIE"

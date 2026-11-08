@@ -24,7 +24,9 @@ The game engine already did the geometry and arithmetic for you. Every option li
   defensive tiles, units adjacent to enemy melee should stand on good defence and fortify.
 - Use only unit ids, targets and tiles that appear in the battle description. Do not invent coordinates.
 - A tile holds one military unit, and options are listed per unit without regard to each other: never send two units
-  to the same tile. A second order for a tile that is already taken is dropped and that unit is left to the regular AI.
+  to the same tile. A second order for a tile that is already taken sends that unit to another tile of its own.
+- A unit can only make the attacks listed under that unit. An enemy being able to hit a unit does not mean the unit
+  can hit back. A unit with no attack listed must move, fortify or hold; an attack order for it is ignored.
 - Orders are carried out one by one with real dice. If something goes differently from the menu (an order fails,
   a unit dies, a target survives a "KILLS" attack), execution stops and you get the new situation to re-plan.
 
@@ -35,15 +37,15 @@ Answer with ONE JSON object and nothing after it:
 {
   "intent": "short plan for this and the next turn, in $intentLanguage",
   "orders": [
-    {"unit": 17, "action": "attack", "target": 42},
-    {"unit": 23, "action": "attack", "target": "city@8,11", "from": "7,11"},
+    {"unit": 17, "action": "attack", "target": 42, "why": "short reason for this attack, in $intentLanguage"},
+    {"unit": 23, "action": "attack", "target": "city@8,11", "from": "7,11", "why": "short reason, in $intentLanguage"},
     {"unit": 9,  "action": "move", "tile": "7,12", "then": "fortify"},
     {"unit": 31, "action": "move_toward", "tile": "6,10"},
     {"unit": 12, "action": "fortify"}
   ],
   "production_hint": {"city": "city@3,4", "prefer": ["Archer", "Spearman"]}
 }
-Actions: attack (target = enemy unit id or city@x,y, optional "from" tile), move (tile reachable this turn,
+Actions: attack (target = enemy unit id or city@x,y, optional "from" tile, "why" = a few words), move (tile reachable this turn,
 optional "then": "fortify"), move_toward (any tile, for reinforcements far away), fortify, hold.
 production_hint is optional: units to build next in one of our cities (city@x,y) for this fight, from the lineup you are given.
 """.trimIndent()

@@ -24,7 +24,12 @@ class OrderResult(val order: CommanderOrder, val ok: Boolean, val message: Strin
  * Execution stops at the first surprise (see [OrderResult.surprise]) so the commander can show the model the real
  * situation and let it re-plan the units that have not acted yet, as a general would after a lost unit.
  */
-class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: Set<Int>) {
+class OrderExecutor(
+    private val civ: Civilization,
+    private val allowedUnitIds: Set<Int>,
+    /** The menu the model is choosing from, to tell its mistakes from real surprises; replaced after a re-plan */
+    var menu: BattleDigest? = null,
+) {
     /** Units that carried out at least one order; the normal automation skips them this turn */
     val handledUnitIds = HashSet<Int>()
     val results = ArrayList<OrderResult>()
@@ -104,7 +109,12 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
         val targetTile = resolveTarget(order.target ?: order.tile) ?: return fail(order, "target not found (dead or not visible)")
         val options = TargetHelper.getAttackableEnemies(unit, unit.movement.getDistanceToTiles(), listOf(targetTile))
             .filter { it.tileToAttack == targetTile }
-        if (options.isEmpty()) return fail(order, "target ${targetTile.ref()} is out of reach this turn")
+        if (options.isEmpty()) {
+            val offered = menu?.own?.firstOrNull { it.unit == unit }?.attacks?.any { resolveTarget(it.targetRef) == targetTile }
+            // An attack the menu never offered is the model's mistake: the situation is what it was, so re-planning is wasted
+            return if (offered == false) OrderResult(order, false, "target ${targetTile.ref()} is out of reach this turn (not in this unit's menu)")
+                else fail(order, "target ${targetTile.ref()} is out of reach this turn")
+        }
         val wantedFrom = resolveTile(order.from)
         val chosen = options.firstOrNull { it.tileToAttackFrom == wantedFrom }
             ?: BattleDigestBuilder.bestAttackTile(unit, options, TacticalThreatMap.of(civ))!!
@@ -139,9 +149,14 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
     private fun move(unit: MapUnit, order: CommanderOrder): OrderResult {
         val tile = resolveTile(order.tile) ?: return fail(order, "bad tile '${order.tile}'")
         if (tile != unit.getTile()) {
-            // The menu lists tiles per unit, so two units can pick the same one. Not a surprise: re-planning would not help
-            if (tile in claimedTiles)
-                return OrderResult(order, false, "tile ${tile.ref()} is already taken by an earlier order")
+            // The menu lists tiles per unit, so two units can pick the same one. Not a surprise: the unit takes the free
+            // tile of its menu closest to the one it wanted
+            if (tile in claimedTiles) {
+                val alternative = freeMenuTile(unit, tile)
+                    ?: return OrderResult(order, false, "tile ${tile.ref()} is already taken by an earlier order")
+                val redirected = move(unit, order.copy(tile = alternative.ref()))
+                return OrderResult(order, redirected.ok, "tile ${tile.ref()} was taken, instead: ${redirected.message}", redirected.surprise)
+            }
             if (!unit.hasMovement()) return fail(order, "no movement left")
             if (!unit.movement.canReachInCurrentTurn(tile) || !unit.movement.canMoveTo(tile))
                 return fail(order, "cannot reach ${tile.ref()} this turn")
@@ -151,6 +166,15 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
         }
         val fortified = if (order.then == "fortify" && unit.canFortify()) { unit.fortify(); ", fortified" } else ""
         return OrderResult(order, true, "now at ${tile.ref()}$fortified")
+    }
+
+    /** The tile of the unit's menu, as of now, closest to [wanted] that no earlier order took */
+    private fun freeMenuTile(unit: MapUnit, wanted: Tile): Tile? {
+        val engagement = menu?.engagement ?: return null
+        return BattleDigestBuilder.moveOptions(unit, TacticalThreatMap.of(civ), engagement)
+            .filter { it.tile !in claimedTiles }
+            .minWithOrNull(compareBy<MoveOption> { it.tile.aerialDistanceTo(wanted) }.thenBy { it.threat }.thenByDescending { it.defence })
+            ?.tile
     }
 
     private fun moveToward(unit: MapUnit, order: CommanderOrder): OrderResult {
