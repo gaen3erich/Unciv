@@ -71,11 +71,11 @@ object TacticalCommander {
             val digest = BattleDigestBuilder.build(civ, engagement)
             val system = CommanderPrompt.systemPrompt(cfg.intentLanguage)
             val user = CommanderPrompt.userPrompt(digest, previous?.intent, previous?.outcome)
-            val messages = arrayListOf(CommanderMessage("system", system), CommanderMessage("user", user))
+            val messages = listOf(CommanderMessage("system", system), CommanderMessage("user", user))
             logText.appendLine("# ${civ.civName}, turn $turn, battle ${engagement.index} (game ${civ.gameInfo.gameId.take(8)}, model ${model().name})")
             logText.appendLine().appendLine("## Prompt").appendLine().appendLine("```").append(user).appendLine("```")
 
-            var reply = ask(civ, messages, digest, logText, "Answer")
+            var reply = ask(civ, messages, digest, logText, "Answer", cfg)
             var plan = CommanderPlanParser.parse(reply.content)
             logPlan(logText, plan)
 
@@ -89,6 +89,7 @@ object TacticalCommander {
                 val notRun = if (replansLeft > 0) executor.executeUntilSurprise(plan.orders) else { executor.execute(plan.orders); emptyList() }
                 val newResults = executor.results.drop(before)
                 newResults.forEach { logText.appendLine(it) }
+                if (replansLeft <= 0) break // the last plan has been carried out in full, whatever happened to it
                 val surprise = newResults.lastOrNull()?.surprise ?: break
                 val current = refresh(civ, engagement)
                 if (current.ownUnits.none { it.hasMovement() }) {
@@ -98,9 +99,11 @@ object TacticalCommander {
                 replansLeft--
                 logText.appendLine("```")
                 val situation = BattleDigestBuilder.build(civ, current)
+                // Only the current situation and the latest orders: the request must not grow with every re-plan
                 val feedback = buildString {
-                    appendLine("Execution so far:")
-                    executor.results.forEachIndexed { i, r -> appendLine("${i + 1}. $r") }
+                    if (plan.intent.isNotBlank()) appendLine("Your plan: ${plan.intent}").appendLine()
+                    appendLine("Your latest orders:")
+                    newResults.forEachIndexed { i, r -> appendLine("${i + 1}. $r") }
                     appendLine()
                     appendLine("Surprise: $surprise. Execution stopped here; ${notRun.size} of your orders were not carried out.")
                     appendLine("The situation now (units that already acted cannot attack or move any more):")
@@ -109,9 +112,7 @@ object TacticalCommander {
                     appendLine("Give new orders (same JSON format) for the units that can still act. Executed orders are done, do not repeat them.")
                 }
                 logText.appendLine().appendLine("## Replan after a surprise").appendLine().appendLine("```").append(feedback).appendLine("```")
-                messages += CommanderMessage("assistant", reply.content)
-                messages += CommanderMessage("user", feedback)
-                reply = ask(civ, messages, situation, logText, "Replanned answer")
+                reply = ask(civ, listOf(CommanderMessage("system", system), CommanderMessage("user", feedback)), situation, logText, "Replanned answer", cfg)
                 val replanned = CommanderPlanParser.parse(reply.content)
                 logPlan(logText, replanned)
                 if (replanned.intent.isNotBlank()) plan = CommanderPlan(replanned.intent, replanned.orders, plan.productionHints + replanned.productionHints, replanned.warnings)
@@ -152,7 +153,10 @@ object TacticalCommander {
             engagement.reinforcements.filter { !it.isDestroyed && it.civ == civ })
     }
 
-    private fun ask(civ: Civilization, messages: List<CommanderMessage>, digest: BattleDigest, logText: StringBuilder, title: String): CommanderReply {
+    private fun ask(civ: Civilization, messages: List<CommanderMessage>, digest: BattleDigest, logText: StringBuilder, title: String, cfg: CommanderConfig): CommanderReply {
+        val requestChars = messages.sumOf { it.content.length }
+        if (requestChars > cfg.maxRequestChars)
+            throw CommanderModelException("Request of $requestChars characters is over the limit of ${cfg.maxRequestChars}")
         calls.incrementAndGet()
         civ.experimentCounters.commanderCalls++
         val reply = model().complete(messages, digest)
@@ -170,7 +174,8 @@ object TacticalCommander {
     /** Puts the first preferred unit the city can build at the top of its queue */
     private fun applyProductionHints(civ: Civilization, plan: CommanderPlan): List<String> {
         val messages = ArrayList<String>()
-        for (hint in plan.productionHints) {
+        // One per battle, the latest: the arena measures tactics, and every re-plan would otherwise reorder production again
+        for (hint in listOfNotNull(plan.productionHints.lastOrNull())) {
             val city = civ.cities.firstOrNull { it.ref().equals(hint.city, ignoreCase = true) || it.name.equals(hint.city, ignoreCase = true) }
             if (city == null) { messages += "production_hint: no own city '${hint.city}'"; continue }
             val constructions = city.cityConstructions

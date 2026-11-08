@@ -233,6 +233,8 @@ data class ArenaConfig(
     /** Production a city is worth in the score */
     val cityWeight: Int = 300,
     val set: ArenaSet = ArenaSet.Tune,
+    /** Positions with more units than this are skipped: large battles cost the most model calls */
+    val maxUnits: Int = Int.MAX_VALUE,
     val threads: Int = Runtime.getRuntime().availableProcessors(),
     val log: (String) -> Unit = ::println,
 )
@@ -242,10 +244,14 @@ class TacticalArena(private val config: ArenaConfig) {
     var crashedPositions = 0
         private set
 
-    fun run(store: ArenaPositionStore): List<ArenaPositionResult> {
+    /** @param onProgress called with all results so far after each position, so that an interrupted run loses nothing */
+    fun run(store: ArenaPositionStore, onProgress: (List<ArenaPositionResult>) -> Unit = {}): List<ArenaPositionResult> {
         AiExperiment.ensureBlankNations(2)
-        val positions = store.positions().filter { it.isIn(config.set) }
+        val inSet = store.positions().filter { it.isIn(config.set) }
+        val positions = inSet.filter { it.units <= config.maxUnits }
+        if (positions.size < inSet.size) config.log("Skipping ${inSet.size - positions.size} positions with more than ${config.maxUnits} units")
         val done = AtomicInteger()
+        val finished = ArrayList<ArenaPositionResult>()
         config.log("Tactical arena: candidate '${config.candidate}' vs baseline '${config.baseline}', " +
             "${positions.size} positions (${config.set}), ${config.horizon} turns each, ${config.threads} threads")
         return runArenaJobs(positions, config.threads,
@@ -256,6 +262,10 @@ class TacticalArena(private val config: ArenaConfig) {
         ) { position ->
             val result = playPosition(position, store.gameData(position))
             config.log("[${done.incrementAndGet()}/${positions.size}] ${position.id}: effect %.0f".format(result.effect(config.cityWeight)))
+            synchronized(finished) {
+                finished += result
+                onProgress(finished.sortedBy { it.position.id })
+            }
             result
         }.sortedBy { it.position.id }
     }

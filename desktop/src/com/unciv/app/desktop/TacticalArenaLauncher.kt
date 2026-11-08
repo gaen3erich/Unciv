@@ -50,6 +50,7 @@ run:
   --horizon=<n>            turns to play from each position (default: 15)
   --city-weight=<n>        production a city is worth in the score (default: 300)
   --set=tune|holdout|all   which positions to play (default: tune); holdout is for the final check only
+  --max-units=<n>          skip positions with more units than this (default: no limit)
   --out=<dir>              where to write report.md and positions.csv (default: build/ai-arena when run from Gradle)
 
 LlmCommander is configured with UNCIV_COMMANDER_* environment variables, see docs/LLM_COMMANDER.md
@@ -115,6 +116,7 @@ LlmCommander is configured with UNCIV_COMMANDER_* environment variables, see doc
             horizon = options["horizon"]?.toInt() ?: 15,
             cityWeight = options["city-weight"]?.toInt() ?: 300,
             set = ArenaSet.entries.first { it.name.equals(options["set"] ?: "tune", ignoreCase = true) },
+            maxUnits = options["max-units"]?.toInt() ?: Int.MAX_VALUE,
             threads = threads,
         )
         if (config.candidate.has(AiFeature.LlmCommander) || config.baseline.has(AiFeature.LlmCommander)) {
@@ -123,12 +125,15 @@ LlmCommander is configured with UNCIV_COMMANDER_* environment variables, see doc
                 else "${commander.model} at ${commander.baseUrl}") + ", logs in ${commander.logDirFile() ?: "nowhere"}")
         }
         val arena = TacticalArena(config)
-        val results = arena.run(store)
-        val report = TacticalArenaReport(config, results, arena.crashedPositions)
-
         outDir.mkdirs()
-        File(outDir, "report.md").writeText(report.markdown())
-        File(outDir, "positions.csv").writeText(report.csv())
+        fun write(report: TacticalArenaReport) {
+            File(outDir, "report.md").writeText(report.markdown())
+            File(outDir, "positions.csv").writeText(report.csv())
+        }
+        // Written after every position, so that an interrupted run keeps what it has played
+        val results = arena.run(store) { write(TacticalArenaReport(config, it, arena.crashedPositions)) }
+        val report = TacticalArenaReport(config, results, arena.crashedPositions)
+        write(report)
         println()
         println(report.markdown())
         println("Report written to ${outDir.path}")

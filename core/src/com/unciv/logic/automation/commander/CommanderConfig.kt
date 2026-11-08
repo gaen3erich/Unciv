@@ -28,6 +28,8 @@ data class CommanderConfig(
     val maxCalls: Int = 0,
     /** How many times per battle the model is asked again after a surprise during execution (a failed order, a lost unit, a kill that did not happen) */
     val replans: Int = 2,
+    /** A request longer than this is not sent and its battle goes to the regular AI; protects a shared model server */
+    val maxRequestChars: Int = 120_000,
     /** Language the model writes its intent in */
     val intentLanguage: String = "Russian",
     /** Own units at most this many turns away are listed as reinforcements */
@@ -59,6 +61,7 @@ data class CommanderConfig(
                 minUnits = setting("minUnits")?.toIntOrNull() ?: d.minUnits,
                 maxCalls = setting("maxCalls")?.toIntOrNull() ?: d.maxCalls,
                 replans = setting("replans")?.toIntOrNull() ?: d.replans,
+                maxRequestChars = setting("maxRequestChars")?.toIntOrNull() ?: d.maxRequestChars,
                 intentLanguage = setting("intentLanguage") ?: d.intentLanguage,
                 reinforcementTurns = setting("reinforcementTurns")?.toIntOrNull() ?: d.reinforcementTurns,
             )

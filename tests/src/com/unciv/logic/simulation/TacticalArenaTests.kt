@@ -243,6 +243,23 @@ class TacticalArenaTests {
     }
 
     @Test
+    fun `arena reports progress after every position and skips battles over the unit limit`() {
+        val field = battlefield()
+        val store = ArenaPositionStore(Files.createTempDirectory("arena").toFile())
+        val save = UncivFiles.gameInfoToString(field.testGame.gameInfo, forceZip = true)
+        store.add(position("s1-t1"), save)
+        store.add(position("s2-t1"), save)
+        store.add(position("s3-t1").copy(units = 50), save)
+        val progress = ArrayList<List<String>>()
+        val arena = TacticalArena(ArenaConfig(profile, profile, horizon = 4, maxUnits = 10, threads = 1, log = {}))
+
+        val results = arena.run(store) { finished -> progress += finished.map { it.position.id } }
+
+        assertEquals(listOf("s1-t1", "s2-t1"), results.map { it.position.id })
+        assertEquals(listOf(1, 2), progress.map { it.size })
+    }
+
+    @Test
     fun `arena plays the positions of the chosen set`() {
         val field = battlefield()
         val store = ArenaPositionStore(Files.createTempDirectory("arena").toFile())

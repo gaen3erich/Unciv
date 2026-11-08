@@ -63,6 +63,7 @@
    | `UNCIV_COMMANDER_TIMEOUT_SECONDS` | 600 | Таймаут одного вызова. |
    | `UNCIV_COMMANDER_TEMPERATURE` | 0.3 | |
    | `UNCIV_COMMANDER_REPLANS` | 2 | Сколько раз за бой модель перепланирует после сюрприза. 0 — приказы просто выполняются до конца. |
+   | `UNCIV_COMMANDER_MAX_REQUEST_CHARS` | 120000 | Запрос длиннее не отправляется, бой уходит обычному AI. Защита общего сервера с моделью. |
    | `UNCIV_COMMANDER_MIN_UNITS` | 3 | Порог важности боя. |
    | `UNCIV_COMMANDER_MAX_CALLS` | 0 | Лимит вызовов на запуск, 0 — без лимита. После лимита бои уходят обычному AI. |
    | `UNCIV_COMMANDER_LOG_DIR` | `commander-logs` | Куда писать логи (относительно рабочей папки, у Gradle-задач это `android/assets`). |

@@ -28,6 +28,8 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
     /** Units that carried out at least one order; the normal automation skips them this turn */
     val handledUnitIds = HashSet<Int>()
     val results = ArrayList<OrderResult>()
+    /** Tiles earlier orders of this battle moved a unit to */
+    private val claimedTiles = HashSet<Tile>()
 
     /** Executes all [orders], surprises or not */
     fun execute(orders: List<CommanderOrder>): List<OrderResult> {
@@ -116,6 +118,7 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
         Battle.moveAndAttack(MapUnitCombatant(unit), chosen)
         if (!unit.isDestroyed && unit.attacksThisTurn == attacksBefore)
             return fail(order, "could not attack from ${chosen.tileToAttackFrom.ref()}")
+        if (!unit.isDestroyed) claimedTiles += unit.getTile()
         val targetHealthAfter = if (defender.isDefeated()) 0 else defender.getHealth()
         val outcome = when {
             unit.isDestroyed -> "our unit died"
@@ -136,11 +139,15 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
     private fun move(unit: MapUnit, order: CommanderOrder): OrderResult {
         val tile = resolveTile(order.tile) ?: return fail(order, "bad tile '${order.tile}'")
         if (tile != unit.getTile()) {
+            // The menu lists tiles per unit, so two units can pick the same one. Not a surprise: re-planning would not help
+            if (tile in claimedTiles)
+                return OrderResult(order, false, "tile ${tile.ref()} is already taken by an earlier order")
             if (!unit.hasMovement()) return fail(order, "no movement left")
             if (!unit.movement.canReachInCurrentTurn(tile) || !unit.movement.canMoveTo(tile))
                 return fail(order, "cannot reach ${tile.ref()} this turn")
             unit.movement.moveToTile(tile)
             if (unit.getTile() != tile) return fail(order, "stopped at ${unit.getTile().ref()} instead of ${tile.ref()}")
+            claimedTiles += tile
         }
         val fortified = if (order.then == "fortify" && unit.canFortify()) { unit.fortify(); ", fortified" } else ""
         return OrderResult(order, true, "now at ${tile.ref()}$fortified")
@@ -152,6 +159,7 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
         val start = unit.getTile()
         if (!unit.movement.canReach(tile)) return fail(order, "no path to ${tile.ref()}")
         unit.movement.headTowards(tile)
+        if (unit.getTile() != start) claimedTiles += unit.getTile()
         return if (unit.getTile() == start && start != tile) fail(order, "could not move closer to ${tile.ref()}")
             else OrderResult(order, true, "moved ${start.ref()} -> ${unit.getTile().ref()}")
     }

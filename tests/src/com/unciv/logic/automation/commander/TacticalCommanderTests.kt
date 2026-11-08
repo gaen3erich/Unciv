@@ -201,6 +201,83 @@ class TacticalCommanderTests {
         logDir.deleteRecursively()
     }
 
+    private fun alwaysFailing() = """{"intent": "a", "orders": [{"unit": ${warrior.id}, "action": "move", "tile": "99,99"}]}"""
+
+    @Test
+    fun replanLimitHoldsWhenTheLastOrderKeepsFailing() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val model = ScriptedModel(alwaysFailing())
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertEquals(3, model.asked.size)
+    }
+
+    @Test
+    fun replanRequestsDoNotGrow() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 5)
+        val model = ScriptedModel(alwaysFailing())
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertEquals(6, model.asked.size)
+        for (request in model.asked) assertEquals(2, request.size)
+        val sizes = model.asked.drop(1).map { request -> request.sumOf { it.content.length } }
+        assertEquals("every re-plan is the same size: $sizes", 1, sizes.toSet().size)
+    }
+
+    @Test
+    fun requestOverTheLimitIsNotSent() {
+        TacticalCommander.config = CommanderConfig(logDir = "", maxRequestChars = 100)
+        val model = ScriptedModel(alwaysFailing())
+        TacticalCommander.modelOverride = model
+
+        assertTrue(TacticalCommander.commandBattles(us).isEmpty())
+
+        assertEquals(0, model.asked.size)
+        assertEquals(1, us.experimentCounters.commanderModelErrors)
+    }
+
+    @Test
+    fun secondOrderForTheSameTileIsDroppedWithoutReplanning() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val free = archer.movement.getDistanceToTiles().keys.first { tile ->
+            tile != archer.getTile() && tile != warrior.getTile() && tile.militaryUnit == null &&
+                tile in warrior.movement.getDistanceToTiles().keys
+        }
+        val spot = "${free.position.x},${free.position.y}"
+        val model = ScriptedModel(
+            """{"intent": "a", "orders": [{"unit": ${archer.id}, "action": "move", "tile": "$spot"},
+                {"unit": ${warrior.id}, "action": "move", "tile": "$spot"}]}""")
+        TacticalCommander.modelOverride = model
+
+        val handled = TacticalCommander.commandBattles(us)
+
+        assertEquals(1, model.asked.size)
+        assertEquals(setOf(archer.id), handled)
+        assertEquals(free, archer.getTile())
+    }
+
+    @Test
+    fun onlyTheLatestProductionHintOfABattleIsApplied() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val city = us.cities.single()
+        val hint = { unit: String -> """"production_hint": {"city": "city@${city.location.x},${city.location.y}", "prefer": ["$unit"]}""" }
+        val model = ScriptedModel(
+            """{"intent": "a", "orders": [{"unit": ${warrior.id}, "action": "move", "tile": "99,99"}], ${hint("Scout")}}""",
+            """{"intent": "b", "orders": [{"unit": ${warrior.id}, "action": "fortify"}], ${hint("Warrior")}}""",
+        )
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertEquals(2, model.asked.size)
+        assertEquals(1, us.experimentCounters.commanderProductionHints)
+        assertEquals("Warrior", city.cityConstructions.currentConstructionName())
+    }
+
     @Test
     fun withoutReplansAllOrdersRun() {
         TacticalCommander.config = CommanderConfig(logDir = "", replans = 0)
