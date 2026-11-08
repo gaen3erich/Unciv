@@ -8,8 +8,12 @@ import com.unciv.logic.civilization.Civilization
 import com.unciv.logic.map.mapunit.MapUnit
 import com.unciv.logic.map.tile.Tile
 
-class OrderResult(val order: CommanderOrder, val ok: Boolean, val message: String) {
-    override fun toString() = (if (ok) "OK   " else "FAIL ") + order + ": " + message
+/**
+ * @property surprise set when the order went differently from what the menu promised: it could not be carried out,
+ *   our unit died, or a target the menu said would die survived. The model is asked again after a surprise.
+ */
+class OrderResult(val order: CommanderOrder, val ok: Boolean, val message: String, val surprise: String? = null) {
+    override fun toString() = (if (ok) "OK   " else "FAIL ") + order + ": " + message + (if (surprise != null) "  <- SURPRISE: $surprise" else "")
 }
 
 /**
@@ -17,26 +21,41 @@ class OrderResult(val order: CommanderOrder, val ok: Boolean, val message: Strin
  * dead by then, the tile taken). An order that cannot run is reported and skipped; its unit is left to the normal
  * automation (UnitTactics), so a bad answer degrades to the usual AI instead of wasting the turn.
  *
- * Works on any game, so the same code plays the plan on a copy of the game for the model to review
- * ([PlanSimulator]) and then for real.
+ * Execution stops at the first surprise (see [OrderResult.surprise]) so the commander can show the model the real
+ * situation and let it re-plan the units that have not acted yet, as a general would after a lost unit.
  */
 class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: Set<Int>) {
     /** Units that carried out at least one order; the normal automation skips them this turn */
     val handledUnitIds = HashSet<Int>()
     val results = ArrayList<OrderResult>()
 
+    /** Executes all [orders], surprises or not */
     fun execute(orders: List<CommanderOrder>): List<OrderResult> {
-        for (order in orders) {
-            val result = try { executeOne(order) } catch (e: Exception) {
-                OrderResult(order, false, "error: ${e.javaClass.simpleName} ${e.message}")
-            }
-            results += result
-            if (result.ok) handledUnitIds += order.unitId
-        }
+        for (order in orders) run(order)
         return results
     }
 
-    private fun fail(order: CommanderOrder, why: String) = OrderResult(order, false, why)
+    /**
+     * Executes [orders] in sequence and stops right after the first order with a surprise.
+     * @return the orders not executed yet (empty when everything ran)
+     */
+    fun executeUntilSurprise(orders: List<CommanderOrder>): List<CommanderOrder> {
+        for ((i, order) in orders.withIndex()) {
+            if (run(order).surprise != null) return orders.drop(i + 1)
+        }
+        return emptyList()
+    }
+
+    private fun run(order: CommanderOrder): OrderResult {
+        val result = try { executeOne(order) } catch (e: Exception) {
+            fail(order, "error: ${e.javaClass.simpleName} ${e.message}")
+        }
+        results += result
+        if (result.ok) handledUnitIds += order.unitId
+        return result
+    }
+
+    private fun fail(order: CommanderOrder, why: String) = OrderResult(order, false, why, surprise = "order failed")
 
     private fun executeOne(order: CommanderOrder): OrderResult {
         if (order.unitId !in allowedUnitIds) return fail(order, "unit is not one of ours in this battle")
@@ -88,6 +107,8 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
         val chosen = options.firstOrNull { it.tileToAttackFrom == wantedFrom }
             ?: BattleDigestBuilder.bestAttackTile(unit, options, TacticalThreatMap.of(civ))!!
         val defender = chosen.combatant ?: return fail(order, "nothing to attack at ${targetTile.ref()}")
+        // What the menu promises, at average luck, to compare with what really happens
+        val expected = BattleDigestBuilder.describeAttack(unit, chosen, TacticalThreatMap.of(civ))
         val defenderName = defender.getName()
         val targetHealthBefore = defender.getHealth()
         val healthBefore = unit.health
@@ -103,7 +124,13 @@ class OrderExecutor(private val civ: Civilization, private val allowedUnitIds: S
             else -> "target hp $targetHealthBefore -> $targetHealthAfter"
         }
         val ourHealth = if (unit.isDestroyed) 0 else unit.health
-        return OrderResult(order, true, "attacked $defenderName from ${chosen.tileToAttackFrom.ref()}: $outcome; our hp $healthBefore -> $ourHealth")
+        val surprise = when {
+            unit.isDestroyed && expected?.attackerDies != true -> "our ${unit.name} died"
+            expected?.kills == true && !defender.isDefeated() && targetHealthAfter > 0 && targetTile.getOwner() != civ ->
+                "$defenderName survived with $targetHealthAfter hp"
+            else -> null
+        }
+        return OrderResult(order, true, "attacked $defenderName from ${chosen.tileToAttackFrom.ref()}: $outcome; our hp $healthBefore -> $ourHealth", surprise)
     }
 
     private fun move(unit: MapUnit, order: CommanderOrder): OrderResult {

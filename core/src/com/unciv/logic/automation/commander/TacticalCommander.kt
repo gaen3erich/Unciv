@@ -12,8 +12,9 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Once per turn, before the regular unit automation, it finds the battles the civ is in ([BattleDetector]), and for
  * each important one makes ONE model call with a menu of computed options ([BattleDigestBuilder]). The answer is an
- * ordered list of orders, which is first played on a copy of the game and shown back to the model for one revision
- * ([PlanSimulator]), then executed for real ([OrderExecutor]). Units with an executed order are skipped by the regular
+ * ordered list of orders, executed one by one ([OrderExecutor]). When something goes differently from the menu's
+ * promise (an order fails, a unit dies, a kill does not happen), execution stops and the model re-plans the units that
+ * can still act, seeing only what a player would see. Units with an executed order are skipped by the regular
  * automation this turn; all others, and everything when the model fails, are left to UnitTactics / the default AI.
  *
  * The model's intent is remembered per battle and shown again next turn, so plans carry over.
@@ -78,29 +79,49 @@ object TacticalCommander {
             var plan = CommanderPlanParser.parse(reply.content)
             logPlan(logText, plan)
 
-            repeat(cfg.revisions) {
-                if (plan.orders.isEmpty()) return@repeat
-                val simulation = try { PlanSimulator.simulate(civ, engagement, plan, allowed) } catch (e: Exception) {
-                    logText.appendLine().appendLine("Simulation failed, plan used without review: ${e.javaClass.simpleName} ${e.message} at ${e.stackTrace.take(4).joinToString(" < ")}")
-                    return@repeat
+            // Execute; after a surprise (failed order, lost unit, a kill that did not happen) show the model the
+            // real situation and let it re-plan the units that can still act. No peeking at outcomes in advance.
+            val executor = OrderExecutor(civ, allowed)
+            var replansLeft = cfg.replans
+            logText.appendLine().appendLine("## Execution").appendLine().appendLine("```")
+            while (true) {
+                val before = executor.results.size
+                val notRun = if (replansLeft > 0) executor.executeUntilSurprise(plan.orders) else { executor.execute(plan.orders); emptyList() }
+                val newResults = executor.results.drop(before)
+                newResults.forEach { logText.appendLine(it) }
+                val surprise = newResults.lastOrNull()?.surprise ?: break
+                val current = refresh(civ, engagement)
+                if (current.ownUnits.none { it.hasMovement() }) {
+                    if (notRun.isNotEmpty()) logText.appendLine("(no unit can act any more, ${notRun.size} orders dropped)")
+                    break
                 }
-                val feedback = simulation.feedback + "\nIf this is what you want, repeat the same JSON. Otherwise answer with the corrected JSON (same format)."
-                logText.appendLine().appendLine("## Simulation").appendLine().appendLine("```").append(feedback).appendLine("```")
+                replansLeft--
+                logText.appendLine("```")
+                val situation = BattleDigestBuilder.build(civ, current)
+                val feedback = buildString {
+                    appendLine("Execution so far:")
+                    executor.results.forEachIndexed { i, r -> appendLine("${i + 1}. $r") }
+                    appendLine()
+                    appendLine("Surprise: $surprise. Execution stopped here; ${notRun.size} of your orders were not carried out.")
+                    appendLine("The situation now (units that already acted cannot attack or move any more):")
+                    appendLine()
+                    append(BattleDigestBuilder.render(situation))
+                    appendLine("Give new orders (same JSON format) for the units that can still act. Executed orders are done, do not repeat them.")
+                }
+                logText.appendLine().appendLine("## Replan after a surprise").appendLine().appendLine("```").append(feedback).appendLine("```")
                 messages += CommanderMessage("assistant", reply.content)
                 messages += CommanderMessage("user", feedback)
-                reply = ask(civ, messages, digest, logText, "Revised answer")
-                val revised = CommanderPlanParser.parse(reply.content)
-                logPlan(logText, revised)
-                if (revised.orders.isNotEmpty() || revised.warnings.isEmpty()) plan = revised
+                reply = ask(civ, messages, situation, logText, "Replanned answer")
+                val replanned = CommanderPlanParser.parse(reply.content)
+                logPlan(logText, replanned)
+                if (replanned.intent.isNotBlank()) plan = CommanderPlan(replanned.intent, replanned.orders, plan.productionHints + replanned.productionHints, replanned.warnings)
+                else plan = CommanderPlan(plan.intent, replanned.orders, plan.productionHints + replanned.productionHints, replanned.warnings)
+                logText.appendLine().appendLine("## Execution, continued").appendLine().appendLine("```")
             }
-
-            val executor = OrderExecutor(civ, allowed)
-            val results = executor.execute(plan.orders)
+            val results = executor.results
             val ok = results.count { it.ok }
             civ.experimentCounters.commanderOrdersOk += ok
             civ.experimentCounters.commanderOrdersFailed += results.size - ok
-            logText.appendLine().appendLine("## Execution").appendLine().appendLine("```")
-            results.forEach { logText.appendLine(it) }
             val hints = applyProductionHints(civ, plan)
             hints.forEach { logText.appendLine(it) }
             logText.appendLine("```")
@@ -118,6 +139,17 @@ object TacticalCommander {
         } finally {
             log(cfg, logName, logText.toString())
         }
+    }
+
+    /** The battle as it stands now: dead units dropped, everything else as when the battle was detected */
+    private fun refresh(civ: Civilization, engagement: Engagement): Engagement {
+        val visible = BattleDetector.visibleEnemyUnits(civ).toSet()
+        return Engagement(engagement.index,
+            engagement.ownUnits.filter { !it.isDestroyed && it.civ == civ },
+            engagement.enemyUnits.filter { !it.isDestroyed && it in visible },
+            engagement.ownCities.filter { it.civ == civ },
+            engagement.enemyCities.filter { it.civ != civ && civ.isAtWarWith(it.civ) },
+            engagement.reinforcements.filter { !it.isDestroyed && it.civ == civ })
     }
 
     private fun ask(civ: Civilization, messages: List<CommanderMessage>, digest: BattleDigest, logText: StringBuilder, title: String): CommanderReply {

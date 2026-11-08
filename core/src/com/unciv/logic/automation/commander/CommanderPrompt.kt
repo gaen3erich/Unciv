@@ -23,6 +23,8 @@ The game engine already did the geometry and arithmetic for you. Every option li
 - Usually: ranged units shoot first, melee units finish wounded targets, wounded units pull back to safe or
   defensive tiles, units adjacent to enemy melee should stand on good defence and fortify.
 - Use only unit ids, targets and tiles that appear in the battle description. Do not invent coordinates.
+- Orders are carried out one by one with real dice. If something goes differently from the menu (an order fails,
+  a unit dies, a target survives a "KILLS" attack), execution stops and you get the new situation to re-plan.
 
 Think about coordination: focus fire to kill units (a dead unit deals no damage next turn), protect ranged units,
 do not leave units on tiles where they will die for nothing, take cities when their hp is low.

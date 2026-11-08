@@ -29,7 +29,7 @@ class ExperimentCounters {
 
     /** [com.unciv.logic.automation.AiFeature.LlmCommander]: battles handed to the model */
     var commanderBattles = 0
-    /** LlmCommander: model calls, revisions included */
+    /** LlmCommander: model calls, re-plans after surprises included */
     var commanderCalls = 0
     var commanderOrdersOk = 0
     /** LlmCommander: orders that could not be carried out; their units fell back to the default AI */

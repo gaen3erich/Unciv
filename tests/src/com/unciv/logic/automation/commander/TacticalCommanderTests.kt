@@ -4,7 +4,6 @@ import com.sun.net.httpserver.HttpServer
 import com.unciv.logic.automation.AiProfile
 import com.unciv.logic.civilization.Civilization
 import com.unciv.logic.map.mapunit.MapUnit
-import com.unciv.models.ruleset.RulesetCache
 import com.unciv.testing.GdxTestRunner
 import com.unciv.testing.TestGame
 import org.junit.After
@@ -152,25 +151,66 @@ class TacticalCommanderTests {
     @Test
     fun commanderRunsTheWholeLoopWithTheStubModel() {
         val logDir = Files.createTempDirectory("commander").toFile()
-        TacticalCommander.config = CommanderConfig(logDir = logDir.path, revisions = 1)
+        TacticalCommander.config = CommanderConfig(logDir = logDir.path)
         TacticalCommander.modelOverride = StubCommanderModel()
 
-        // The plan is played on a copy of the game first, which reloads the ruleset by name: let it find the test ruleset
-        game.addCiv(isPlayer = true) // real games always have a human or spectator, and reloading a game needs one
-        val base = game.gameInfo.gameParameters.baseRuleset
-        val original = RulesetCache[base]!!
-        RulesetCache[base] = game.ruleset
-        val handled = try { TacticalCommander.commandBattles(us) } finally { RulesetCache[base] = original }
+        val handled = TacticalCommander.commandBattles(us)
         assertTrue(handled.isNotEmpty())
         assertEquals(1, us.experimentCounters.commanderBattles)
         val log = logDir.listFiles()!!.single { it.name.endsWith(".md") }.readText()
-        assertEquals(log, 2, us.experimentCounters.commanderCalls) // answer + one revision
+        assertTrue(log, us.experimentCounters.commanderCalls >= 1)
         assertEquals(0, us.experimentCounters.commanderModelErrors)
-        assertTrue(log, log.contains("## Simulation"))
-        assertTrue(log, log.contains("Enemy units destroyed: #${enemyWarrior.id}"))
         assertTrue(log, log.contains("## Execution"))
+        assertTrue(log, log.contains("OK   #${archer.id} attack"))
         assertTrue(File(logDir, "system-prompt.txt").exists())
         logDir.deleteRecursively()
+    }
+
+    /** Answers with the given texts in turn, recording what it was asked */
+    private class ScriptedModel(vararg val answers: String) : CommanderModel {
+        override val name = "scripted"
+        val asked = ArrayList<List<CommanderMessage>>()
+        override fun complete(messages: List<CommanderMessage>, digest: BattleDigest): CommanderReply {
+            asked += messages.toList()
+            return CommanderReply(answers[(asked.size - 1).coerceAtMost(answers.size - 1)])
+        }
+    }
+
+    @Test
+    fun surpriseStopsExecutionAndTheModelReplans() {
+        val logDir = Files.createTempDirectory("commander").toFile()
+        TacticalCommander.config = CommanderConfig(logDir = logDir.path, replans = 2)
+        // First plan: an impossible move (a surprise), then an attack that must not run before the re-plan
+        val model = ScriptedModel(
+            """{"intent": "a", "orders": [{"unit": ${warrior.id}, "action": "move", "tile": "99,99"},
+                {"unit": ${archer.id}, "action": "attack", "target": ${enemyWarrior.id}}]}""",
+            """{"intent": "b", "orders": [{"unit": ${archer.id}, "action": "attack", "target": ${enemyWarrior.id}},
+                {"unit": ${warrior.id}, "action": "fortify"}]}""",
+        )
+        TacticalCommander.modelOverride = model
+
+        val handled = TacticalCommander.commandBattles(us)
+        assertEquals(2, model.asked.size)
+        val replanPrompt = model.asked[1].last().content
+        assertTrue(replanPrompt, replanPrompt.contains("Surprise: order failed"))
+        assertTrue(replanPrompt, replanPrompt.contains("1 of your orders were not carried out"))
+        assertEquals(setOf(archer.id, warrior.id), handled)
+        assertTrue(archer.attacksThisTurn == 1)
+        val log = logDir.listFiles()!!.single { it.name.endsWith(".md") }.readText()
+        assertTrue(log, log.contains("## Replan after a surprise"))
+        logDir.deleteRecursively()
+    }
+
+    @Test
+    fun withoutReplansAllOrdersRun() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 0)
+        val model = ScriptedModel(
+            """{"intent": "a", "orders": [{"unit": ${warrior.id}, "action": "move", "tile": "99,99"},
+                {"unit": ${archer.id}, "action": "attack", "target": ${enemyWarrior.id}}]}""")
+        TacticalCommander.modelOverride = model
+        TacticalCommander.commandBattles(us)
+        assertEquals(1, model.asked.size)
+        assertEquals(1, archer.attacksThisTurn)
     }
 
     @Test

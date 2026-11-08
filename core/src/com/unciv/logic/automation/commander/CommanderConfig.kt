@@ -26,8 +26,8 @@ data class CommanderConfig(
     val minUnits: Int = 3,
     /** Stop calling the model after this many calls in one run (0 = unlimited); later battles fall back to UnitTactics */
     val maxCalls: Int = 0,
-    /** How many times the model may revise its plan after seeing it played out on a copy of the game */
-    val revisions: Int = 1,
+    /** How many times per battle the model is asked again after a surprise during execution (a failed order, a lost unit, a kill that did not happen) */
+    val replans: Int = 2,
     /** Language the model writes its intent in */
     val intentLanguage: String = "Russian",
     /** Own units at most this many turns away are listed as reinforcements */
@@ -58,7 +58,7 @@ data class CommanderConfig(
                 logDir = setting("logDir") ?: d.logDir,
                 minUnits = setting("minUnits")?.toIntOrNull() ?: d.minUnits,
                 maxCalls = setting("maxCalls")?.toIntOrNull() ?: d.maxCalls,
-                revisions = setting("revisions")?.toIntOrNull() ?: d.revisions,
+                replans = setting("replans")?.toIntOrNull() ?: d.replans,
                 intentLanguage = setting("intentLanguage") ?: d.intentLanguage,
                 reinforcementTurns = setting("reinforcementTurns")?.toIntOrNull() ?: d.reinforcementTurns,
             )
