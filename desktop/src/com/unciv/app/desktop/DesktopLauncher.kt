@@ -7,6 +7,7 @@ import com.badlogic.gdx.utils.Os
 import com.badlogic.gdx.utils.SharedLibraryLoader
 import com.unciv.UncivGame
 import com.unciv.app.desktop.DesktopScreenMode.Companion.getMaximumWindowBounds
+import com.unciv.app.desktop.llm.DesktopLlmInGameSetup
 import com.unciv.json.json
 import com.unciv.logic.files.SETTINGS_FILE_NAME
 import com.unciv.logic.files.UncivFiles
@@ -89,6 +90,9 @@ internal object DesktopLauncher {
 
         // Setup Desktop logging
         Log.backend = DesktopLogBackend()
+
+        // Optional: let the LLM agent play AI civs of the games started in this window
+        DesktopLlmInGameSetup.installIfConfigured(arg)
 
         // Setup Desktop display
         Display.platform = DesktopDisplay()

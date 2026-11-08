@@ -1,0 +1,12 @@
+{
+  "schema": "llm-agent-config/v1",
+  "name": "fake-replay-smoke",
+  "description": "Replay a recorded transcript through FakeLlmClient. No network.",
+  "client": {
+    "kind": "fake",
+    "transcriptPath": "tests/fixtures/llm-transcripts/end-turn-only.jsonl"
+  },
+  "request": { "temperature": 0.0, "maxTokens": 4096 },
+  "policy": { "kind": "llm", "fallback": "end_turn_only", "failOnLlmErrorAfterConsecutive": 5 },
+  "trace": { "includePrompts": false, "includeRationale": true }
+}

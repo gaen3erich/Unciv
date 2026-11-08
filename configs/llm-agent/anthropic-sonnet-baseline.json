@@ -1,0 +1,15 @@
+{
+  "schema": "llm-agent-config/v1",
+  "name": "anthropic-sonnet-baseline",
+  "description": "Example Anthropic Stage A config. Verify model availability before running.",
+  "client": {
+    "kind": "anthropic",
+    "apiKeyEnv": "ANTHROPIC_API_KEY",
+    "model": "claude-sonnet-4-5",
+    "timeoutSeconds": 60,
+    "maxRetries": 2
+  },
+  "request": { "temperature": 0.0, "maxTokens": 4096 },
+  "policy": { "kind": "llm", "fallback": "end_turn_only", "failOnLlmErrorAfterConsecutive": 5 },
+  "trace": { "includePrompts": false, "includeRationale": true }
+}
