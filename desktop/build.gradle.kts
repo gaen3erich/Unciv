@@ -58,6 +58,16 @@ tasks.register<JavaExec>("aiExperiment") {
     maxHeapSize = (project.findProperty("aiExperimentHeap") as String?) ?: "4g"
 }
 
+// Tactical arena: collects saved battles and plays them out, see docs/TACTICAL_AI_TESTING.md
+tasks.register<JavaExec>("aiArena") {
+    dependsOn(tasks.getByName("classes"))
+    mainClass.set("com.unciv.app.desktop.TacticalArenaLauncher")
+    classpath = sourceSets.main.get().runtimeClasspath
+    workingDir = assetsDir
+    systemProperty("aiArenaOut", rootProject.layout.buildDirectory.dir("ai-arena").get().asFile.absolutePath)
+    maxHeapSize = (project.findProperty("aiExperimentHeap") as String?) ?: "4g"
+}
+
 tasks.register<JavaExec>("llmGatewayCli") {
     dependsOn(tasks.getByName("classes"))
     mainClass.set("com.unciv.app.desktop.LlmGatewayCli")

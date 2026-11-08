@@ -187,8 +187,8 @@ object Battle {
         attackedTile: Tile
     ) {
         if (defender.isDefeated() && defender is MapUnitCombatant && !defender.unit.isCivilian()) {
-            attacker.getCivInfo().let { it.experimentCounters.unitKilled(StrategicPlanner.activePlan(it)?.phase) }
-            defender.getCivInfo().let { it.experimentCounters.unitLost(StrategicPlanner.activePlan(it)?.phase, attacking = false) }
+            attacker.getCivInfo().let { it.experimentCounters.unitKilled(StrategicPlanner.activePlan(it)?.phase, defender.unit.baseUnit.cost) }
+            defender.getCivInfo().let { it.experimentCounters.unitLost(StrategicPlanner.activePlan(it)?.phase, attacking = false, defender.unit.baseUnit.cost) }
             tryEarnFromKilling(attacker, defender)
             tryHealAfterKilling(attacker)
 
@@ -196,8 +196,8 @@ object Battle {
             triggerDefeatUniques(defender, attacker, attackedTile)
 
         } else if (attacker.isDefeated() && attacker is MapUnitCombatant && !attacker.unit.isCivilian()) {
-            defender.getCivInfo().let { it.experimentCounters.unitKilled(StrategicPlanner.activePlan(it)?.phase) }
-            attacker.getCivInfo().let { it.experimentCounters.unitLost(StrategicPlanner.activePlan(it)?.phase, attacking = true) }
+            defender.getCivInfo().let { it.experimentCounters.unitKilled(StrategicPlanner.activePlan(it)?.phase, attacker.unit.baseUnit.cost) }
+            attacker.getCivInfo().let { it.experimentCounters.unitLost(StrategicPlanner.activePlan(it)?.phase, attacking = true, attacker.unit.baseUnit.cost) }
             tryEarnFromKilling(defender, attacker)
             tryHealAfterKilling(defender)
 

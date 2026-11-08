@@ -137,12 +137,20 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
         private set
 
     init {
-        for (name in civNames)
-            if (name !in ruleset.nations) ruleset.nations[name] = Nation().apply { this.name = name }
+        ensureBlankNations(config.civsPerGame, rulesetName)
     }
 
     companion object {
         const val CIV_NAME_PREFIX = "SimulationCiv"
+
+        /** Adds the blank nations to the cached ruleset; games saved during an experiment need them to load again */
+        fun ensureBlankNations(civs: Int, rulesetName: String = BaseRuleset.Civ_V_GnK.fullName) {
+            val ruleset = RulesetCache[rulesetName] ?: throw IllegalArgumentException("Unknown ruleset $rulesetName")
+            for (index in 1..civs) {
+                val name = "$CIV_NAME_PREFIX$index"
+                if (name !in ruleset.nations) ruleset.nations[name] = Nation().apply { this.name = name }
+            }
+        }
 
         /** Removes the blank nations added by experiments from the cached ruleset */
         fun removeBlankNations(rulesetName: String = BaseRuleset.Civ_V_GnK.fullName) {
@@ -219,8 +227,8 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
         return GameSetupInfo(gameParameters, mapParameters)
     }
 
-    internal fun playGame(seed: Long, swapped: Boolean): GameResult {
-        val startMs = System.currentTimeMillis()
+    /** Creates a new game for [seed] with the AI profiles assigned. Returns it with its major civs in slot order. */
+    fun startGame(seed: Long, swapped: Boolean): Pair<GameInfo, List<Civilization>> {
         // GameStarter keeps state in an object, so only one game may be created at a time
         val gameInfo = synchronized(GameStarter) { GameStarter.startNewGame(newGameSetup(seed)) }
 
@@ -228,6 +236,12 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
         majorCivs.forEachIndexed { index, civ ->
             civ.aiProfile = if (isCandidateSlot(index, swapped)) config.candidate else config.baseline
         }
+        return gameInfo to majorCivs
+    }
+
+    internal fun playGame(seed: Long, swapped: Boolean): GameResult {
+        val startMs = System.currentTimeMillis()
+        val (gameInfo, majorCivs) = startGame(seed, swapped)
 
         val snapshots = majorCivs.associate { it.civName to HashMap<Int, CivSnapshot>() }
         gameInfo.simulateUntilWin = true

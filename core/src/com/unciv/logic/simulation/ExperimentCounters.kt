@@ -54,13 +54,21 @@ class ExperimentCounters {
     val unitsKilledByPhase = IntArray(StrategicPhase.entries.size)
     val unitsLostByPhase = IntArray(StrategicPhase.entries.size)
 
-    fun unitKilled(phase: StrategicPhase?) {
+    /** Production cost of the enemy military units this civ destroyed in combat; the score of [TacticalArena] */
+    var unitCostKilled = 0
+    /** Production cost of the own military units destroyed in combat */
+    var unitCostLost = 0
+
+    /** @param cost production cost of the killed unit; units that cannot be built have a negative one and count as 0 */
+    fun unitKilled(phase: StrategicPhase?, cost: Int = 0) {
         unitsKilled++
+        unitCostKilled += cost.coerceAtLeast(0)
         if (phase != null) unitsKilledByPhase[phase.ordinal]++
     }
 
-    fun unitLost(phase: StrategicPhase?, attacking: Boolean) {
+    fun unitLost(phase: StrategicPhase?, attacking: Boolean, cost: Int = 0) {
         unitsLost++
+        unitCostLost += cost.coerceAtLeast(0)
         if (attacking) unitsLostAttacking++
         if (phase != null) unitsLostByPhase[phase.ordinal]++
     }
