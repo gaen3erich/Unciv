@@ -72,6 +72,12 @@ data class CivResult(
     val tacticalStagingHolds: Int = 0,
     /** FocusFire decisions, see [ExperimentCounters] */
     val focusFireAttacks: Int = 0,
+    /** LlmCommander, see [ExperimentCounters] */
+    val commanderBattles: Int = 0,
+    val commanderCalls: Int = 0,
+    val commanderOrdersOk: Int = 0,
+    val commanderOrdersFailed: Int = 0,
+    val commanderModelErrors: Int = 0,
 )
 
 /** Result of one game */
@@ -242,6 +248,11 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 tacticalStops = counters.tacticalStops,
                 tacticalStagingHolds = counters.tacticalStagingHolds,
                 focusFireAttacks = counters.focusFireAttacks,
+                commanderBattles = counters.commanderBattles,
+                commanderCalls = counters.commanderCalls,
+                commanderOrdersOk = counters.commanderOrdersOk,
+                commanderOrdersFailed = counters.commanderOrdersFailed,
+                commanderModelErrors = counters.commanderModelErrors,
             )
         }
         return GameResult(

@@ -97,6 +97,13 @@ class AiExperimentReport(
         }
         if (results.any { game -> game.civs.any { it.focusFireAttacks > 0 } })
             row("Focus fire: attacks that kill or set up a kill") { it.focusFireAttacks.toDouble() }
+        if (results.any { game -> game.civs.any { it.commanderBattles > 0 } }) {
+            row("LLM commander: battles commanded") { it.commanderBattles.toDouble() }
+            row("LLM commander: model calls") { it.commanderCalls.toDouble() }
+            row("LLM commander: orders carried out") { it.commanderOrdersOk.toDouble() }
+            row("LLM commander: orders failed (unit fell back to AI)") { it.commanderOrdersFailed.toDouble() }
+            row("LLM commander: battles lost to model errors") { it.commanderModelErrors.toDouble() }
+        }
         row("AI time per turn, ms") { it.aiTurnMs }
         appendLine()
         appendLine("Population and cities at turn N only count games that lasted that long.")
