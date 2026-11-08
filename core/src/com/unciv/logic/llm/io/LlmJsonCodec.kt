@@ -369,7 +369,11 @@ class LlmJsonCodec {
         rawField("systemPrompt", trace.systemPrompt?.let { quote(it) } ?: "null"),
         rawField("userPrompt", trace.userPrompt?.let { quote(it) } ?: "null"),
         rawField("failureReason", trace.failureReason?.let { quote(it) } ?: "null"),
-        rawField("failedResponse", trace.failedResponse?.let { quote(it) } ?: "null")
+        rawField("failedResponse", trace.failedResponse?.let { quote(it) } ?: "null"),
+        rawField("retryCount", trace.retryCount.toString()),
+        rawField("firstAttemptRejection", trace.firstAttemptRejection?.let { quote(it) } ?: "null"),
+        rawField("firstAttemptResponse", trace.firstAttemptResponse?.let { quote(it) } ?: "null"),
+        rawField("droppedActionIds", stringArray(trace.droppedActionIds))
     )
 
     private fun field(name: String, value: String) = rawField(name, quote(value))

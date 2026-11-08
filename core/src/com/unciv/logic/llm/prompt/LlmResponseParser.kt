@@ -30,15 +30,20 @@ class LlmResponseParser {
             val json = JsonReader().parse(jsonText)
             val actionsNode = json.get("actions") ?: return null
             val aliases = LlmActionAliases.of(observation)
-            val actions = actionsNode.map { node ->
+            val resolved = actionsNode.map { node ->
                 val id = node.getString("id")
-                aliases.resolve(id) ?: return ParseResult.Failure("Action id is not legal in current observation: $id", jsonText, path)
+                id to aliases.resolve(id)
             }
+            val actions = resolved.mapNotNull { it.second }
+            val droppedIds = resolved.filter { it.second == null }.map { it.first }
+            // Nothing usable is left, so this is a failure rather than an empty decision
+            if (actions.isEmpty() && droppedIds.isNotEmpty())
+                return ParseResult.Failure(illegalIdsReason(droppedIds), jsonText, path)
             val notes = json.getString("notes", null)
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
                 ?.take(LlmPromptBuilder.NOTES_MAX_CHARS)
-            ParseResult.Success(actions, json.getString("rationale", null), path, notes)
+            ParseResult.Success(actions, json.getString("rationale", null), path, notes, droppedIds)
         } catch (_: SerializationException) {
             null
         } catch (ex: Exception) {
@@ -88,8 +93,10 @@ class LlmResponseParser {
         return null
     }
 
-    private companion object {
-        val THINK_BLOCK = Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL)
+    companion object {
+        private val THINK_BLOCK = Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL)
+
+        fun illegalIdsReason(ids: List<String>) = "Action ids are not legal in current observation: ${ids.joinToString()}"
     }
 
     enum class ParsePath {
@@ -106,7 +113,9 @@ class LlmResponseParser {
             val actions: List<LlmLegalAction>,
             val rationale: String?,
             override val parsePath: ParsePath,
-            val notes: String? = null
+            val notes: String? = null,
+            /** Ids the model named that are not legal now; [actions] holds only the legal rest. */
+            val droppedActionIds: List<String> = emptyList()
         ) : ParseResult
 
         data class Failure(

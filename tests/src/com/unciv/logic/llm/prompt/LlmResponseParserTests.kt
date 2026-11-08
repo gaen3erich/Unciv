@@ -60,6 +60,34 @@ class LlmResponseParserTests {
     }
 
     @Test
+    fun `illegal ids are dropped and the legal rest is kept`() {
+        val response = response(toolCall = """{"actions":[{"id":"defend:Rome"},{"id":"end_turn"},{"id":"tech:Writing"}]}""")
+
+        val result = parser.parse(response, observation) as LlmResponseParser.ParseResult.Success
+
+        assertEquals(listOf(endTurn), result.actions)
+        assertEquals(listOf("defend:Rome", "tech:Writing"), result.droppedActionIds)
+    }
+
+    @Test
+    fun `a fully illegal answer fails and names every id`() {
+        val response = response(toolCall = """{"actions":[{"id":"defend:Rome"},{"id":"tech:Writing"}]}""")
+
+        val result = parser.parse(response, observation) as LlmResponseParser.ParseResult.Failure
+
+        assertTrue(result.reason.contains("defend:Rome"))
+        assertTrue(result.reason.contains("tech:Writing"))
+    }
+
+    @Test
+    fun `an explicitly empty action list stays a success`() {
+        val result = parser.parse(response(toolCall = """{"actions":[]}"""), observation) as LlmResponseParser.ParseResult.Success
+
+        assertTrue(result.actions.isEmpty())
+        assertTrue(result.droppedActionIds.isEmpty())
+    }
+
+    @Test
     fun `parses fenced json when no tool call exists`() {
         val response = response(raw = "```json\n{\"actions\":[{\"kind\":\"EndTurn\",\"id\":\"end_turn\"}]}\n```")
 

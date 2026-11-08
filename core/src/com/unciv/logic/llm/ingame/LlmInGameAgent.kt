@@ -61,6 +61,8 @@ class LlmCivTurnController(
                 val line = StringBuilder("[LLM ${civ.civName} T${gameInfo.turns} #$call] $chosen")
                 if (llmCall != null) line.append("  (${llmCall.latencyMs} ms, in ${llmCall.inputTokens} / out ${llmCall.outputTokens} tok)")
                 if (llmCall?.fallbackUsed != null) line.append("  FALLBACK: ${llmCall.fallbackUsed} / ${llmCall.stopReason}")
+                if (llmCall != null && llmCall.retryCount > 0) line.append("\n    retried: ${llmCall.firstAttemptRejection}")
+                if (llmCall != null && llmCall.droppedActionIds.isNotEmpty()) line.append("\n    dropped: ${llmCall.droppedActionIds.joinToString()}")
                 for (rejected in result.rejectedActions) line.append("\n    rejected ${aliases.aliasOf(rejected.action)}: ${rejected.reason}")
                 llmCall?.rationale?.takeIf { it.isNotBlank() }?.let { line.append("\n    why: ").append(it.trim()) }
                 llmCall?.notes?.takeIf { it.isNotBlank() }?.let { line.append("\n    notes: ").append(it.trim()) }

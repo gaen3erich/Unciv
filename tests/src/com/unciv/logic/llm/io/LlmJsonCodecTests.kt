@@ -108,7 +108,11 @@ class LlmJsonCodecTests {
             parsePath = "TOOL_CALL",
             fallbackUsed = "parse_failure",
             failureReason = "Action id is not legal in current observation: bad",
-            failedResponse = """{"actions":[{"id":"bad"}]}"""
+            failedResponse = """{"actions":[{"id":"bad"}]}""",
+            retryCount = 1,
+            firstAttemptRejection = "first rejection",
+            firstAttemptResponse = "first answer",
+            droppedActionIds = listOf("bad")
         )
         val record = LlmTraceRecord(
             step = 0,
@@ -126,6 +130,10 @@ class LlmJsonCodecTests {
 
         assertEquals("Action id is not legal in current observation: bad", llmCall.getString("failureReason"))
         assertEquals("""{"actions":[{"id":"bad"}]}""", llmCall.getString("failedResponse"))
+        assertEquals(1, llmCall.getInt("retryCount"))
+        assertEquals("first rejection", llmCall.getString("firstAttemptRejection"))
+        assertEquals("first answer", llmCall.getString("firstAttemptResponse"))
+        assertEquals("bad", llmCall.get("droppedActionIds").getString(0))
     }
 
     private fun parse(json: String) = JsonReader().parse(json)
