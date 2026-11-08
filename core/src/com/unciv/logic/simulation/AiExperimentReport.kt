@@ -95,6 +95,8 @@ class AiExperimentReport(
             row("Tactics: advances stopped short of deadly tiles") { it.tacticalStops.toDouble() }
             row("Tactics: city approaches held for superiority") { it.tacticalStagingHolds.toDouble() }
         }
+        if (results.any { game -> game.civs.any { it.focusFireAttacks > 0 } })
+            row("Focus fire: attacks that kill or set up a kill") { it.focusFireAttacks.toDouble() }
         row("AI time per turn, ms") { it.aiTurnMs }
         appendLine()
         appendLine("Population and cities at turn N only count games that lasted that long.")

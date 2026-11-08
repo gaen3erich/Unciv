@@ -24,4 +24,6 @@ class ExperimentCounters {
     var tacticalStops = 0
     /** UnitTactics: approaches to an enemy city held back for lack of local superiority */
     var tacticalStagingHolds = 0
+    /** [com.unciv.logic.automation.AiFeature.FocusFire]: attacks chosen because they kill or set up a kill */
+    var focusFireAttacks = 0
 }

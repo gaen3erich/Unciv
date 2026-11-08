@@ -70,6 +70,8 @@ data class CivResult(
     val tacticalEscapes: Int = 0,
     val tacticalStops: Int = 0,
     val tacticalStagingHolds: Int = 0,
+    /** FocusFire decisions, see [ExperimentCounters] */
+    val focusFireAttacks: Int = 0,
 )
 
 /** Result of one game */
@@ -239,6 +241,7 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 tacticalEscapes = counters.tacticalEscapes,
                 tacticalStops = counters.tacticalStops,
                 tacticalStagingHolds = counters.tacticalStagingHolds,
+                focusFireAttacks = counters.focusFireAttacks,
             )
         }
         return GameResult(
