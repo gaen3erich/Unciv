@@ -30,8 +30,19 @@ object BattleHelper {
                     // For mounted units it is fine to attack from these tiles, but with current AI movement logic it is not easy to determine if our unit can meaningfully move away after attacking
                     // Also, AI doesn't build tactical roads
             }
+            .filter {
+                if (!TacticalAutomation.isActive(unit) || TacticalAutomation.isAttackSafeEnough(unit, it)) true
+                else { unit.civ.experimentCounters.tacticalAttacksSkipped++; false }
+            }
 
         val enemyTileToAttack = chooseAttackTarget(unit, attackableEnemies)
+        if (enemyTileToAttack != null && FocusFireAutomation.isActive(unit) && !enemyTileToAttack.tileToAttack.isCityCenter()) {
+            val defender = enemyTileToAttack.tileToAttack.militaryUnit
+            if (defender != null) {
+                val damage = BattleDamage.calculateDamageToDefender(MapUnitCombatant(unit), MapUnitCombatant(defender))
+                if (FocusFireAutomation.focusBonus(unit, enemyTileToAttack, damage) > 0) unit.civ.experimentCounters.focusFireAttacks++
+            }
+        }
 
         if (enemyTileToAttack != null) {
             if (enemyTileToAttack.tileToAttack.militaryUnit == null && unit.baseUnit.isRanged()
@@ -159,8 +170,11 @@ object BattleHelper {
         val militaryUnit = attackTile.tileToAttack.militaryUnit
         val civilianUnit = attackTile.tileToAttack.civilianUnit
         if (militaryUnit != null) {
+            val damage = BattleDamage.calculateDamageToDefender(MapUnitCombatant(attacker), MapUnitCombatant(militaryUnit))
             attackValue = 200 - militaryUnit.health + // continuously prioritise lower-health units
-                BattleDamage.calculateDamageToDefender(MapUnitCombatant(attacker), MapUnitCombatant(militaryUnit))
+                damage
+            if (FocusFireAutomation.isActive(attacker))
+                attackValue += FocusFireAutomation.focusBonus(attacker, attackTile, damage)
         } else if (civilianUnit != null) {
             attackValue = 50
             // Only melee units should really attack/capture civilian units, ranged units may be able to capture by moving

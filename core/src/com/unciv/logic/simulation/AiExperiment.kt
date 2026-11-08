@@ -65,6 +65,13 @@ data class CivResult(
     val citiesConquered: Int,
     val citiesLost: Int,
     val aiTurnMs: Double,
+    /** UnitTactics decisions, see [ExperimentCounters] */
+    val tacticalAttacksSkipped: Int = 0,
+    val tacticalEscapes: Int = 0,
+    val tacticalStops: Int = 0,
+    val tacticalStagingHolds: Int = 0,
+    /** FocusFire decisions, see [ExperimentCounters] */
+    val focusFireAttacks: Int = 0,
 )
 
 /** Result of one game */
@@ -230,6 +237,11 @@ class AiExperiment(private val config: AiExperimentConfig, rulesetName: String =
                 citiesConquered = counters.citiesConquered,
                 citiesLost = counters.citiesLost,
                 aiTurnMs = if (counters.aiTurns == 0) 0.0 else counters.aiTurnNanos / 1e6 / counters.aiTurns,
+                tacticalAttacksSkipped = counters.tacticalAttacksSkipped,
+                tacticalEscapes = counters.tacticalEscapes,
+                tacticalStops = counters.tacticalStops,
+                tacticalStagingHolds = counters.tacticalStagingHolds,
+                focusFireAttacks = counters.focusFireAttacks,
             )
         }
         return GameResult(
