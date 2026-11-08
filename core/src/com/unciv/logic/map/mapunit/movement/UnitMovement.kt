@@ -3,7 +3,7 @@
 package com.unciv.logic.map.mapunit.movement
 
 import com.unciv.Constants
-import com.unciv.UncivGame
+import com.unciv.logic.map.MapPathing
 import com.unciv.logic.automation.Timers.Companion.timeThis
 import com.unciv.logic.civilization.diplomacy.RelationshipLevel
 import com.unciv.logic.map.BFS
@@ -72,7 +72,7 @@ class UnitMovement(val unit: MapUnit) {
         movementCostCache: HashMap<Int, Float> = HashMap(),
         includeOtherEscortUnit: Boolean = true
     ): PathsToTilesWithinTurn = timeThis("getMovementToTilesAtPosition") {
-        if (UncivGame.Current.settings.useAStarPathfinding) {
+        if (MapPathing.useAStarPathfinding(unit.civ)) {
             if (!considerZoneOfControl) require(includeOtherEscortUnit)
             val pathingMap = if (!considerZoneOfControl) aStarPathingWithoutZoneControl
                 else if (includeOtherEscortUnit || !unit.isEscorting()) aStarPathing
@@ -149,7 +149,7 @@ class UnitMovement(val unit: MapUnit) {
     @Readonly @Suppress("purity")
     fun getShortestPath(destination: Tile, avoidDamagingTerrain: Boolean = false): List<Tile> = timeThis<List<Tile>>("getShortestPath")  {
         if (unit.cache.cannotMove) return listOf()
-        if (UncivGame.Current.settings.useAStarPathfinding)
+        if (MapPathing.useAStarPathfinding(unit.civ))
             return aStarPathing.getShortestPath(destination) ?: listOf()
 
         // First try and find a path without damaging terrain
@@ -841,7 +841,7 @@ class UnitMovement(val unit: MapUnit) {
         movementCostCache: HashMap<Int, Float>? = null,
         includeOtherEscortUnit: Boolean = true
     ): PathsToTilesWithinTurn {
-        if (UncivGame.Current.settings.useAStarPathfinding) {
+        if (MapPathing.useAStarPathfinding(unit.civ)) {
             if (!considerZoneOfControl) require(includeOtherEscortUnit)
             val pathingMap = if (!considerZoneOfControl) aStarPathingWithoutZoneControl
                 else if (includeOtherEscortUnit || !unit.isEscorting()) aStarPathing 
