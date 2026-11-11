@@ -15,9 +15,11 @@ data class CommanderOrder(
     /** For attacks: the tile to attack from, `x,y`; for moves: what to do after arriving, e.g. `fortify` */
     val from: String? = null,
     val then: String? = null,
+    /** An option id from the menu, e.g. `28.a1`; with it [action] is `option` and the menu decides the rest */
+    val option: String? = null,
 ) {
     override fun toString(): String = buildString {
-        append("#$unitId $action")
+        append(if (option != null) "#$unitId $option" else "#$unitId $action")
         if (target != null) append(" target=$target")
         if (tile != null) append(" tile=$tile")
         if (from != null) append(" from=$from")
@@ -82,6 +84,14 @@ object CommanderPlanParser {
         val ordersJson = root.get("orders")
         if (ordersJson == null || !ordersJson.isArray) warnings += "no orders array"
         else for ((i, o) in ordersJson.withIndex()) {
+            val option = stringOf(o.get("option"))?.lowercase()?.removePrefix("#")
+            if (option != null) {
+                // The option id names its unit; it wins over a "unit" field that says something else
+                val optionUnit = option.substringBefore('.', "").filter { it.isDigit() }.toIntOrNull() ?: idOf(o.get("unit"))
+                if (optionUnit == null) { warnings += "order ${i + 1}: option '$option' names no unit"; continue }
+                orders += CommanderOrder(optionUnit, "option", then = stringOf(o.get("then"))?.lowercase(), option = option)
+                continue
+            }
             val unitId = idOf(o.get("unit"))
             val action = o.getString("action", "")?.trim()?.lowercase()?.replace(' ', '_') ?: ""
             if (unitId == null) { warnings += "order ${i + 1}: no unit id"; continue }

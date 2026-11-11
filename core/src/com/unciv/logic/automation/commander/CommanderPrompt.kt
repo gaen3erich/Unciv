@@ -12,23 +12,30 @@ You are the field commander of one civilization in the turn-based strategy game 
 Each turn you get ONE battle: our units, visible enemies, cities, reinforcements. You decide what each of our units
 does this turn and in which order. Units you do not mention are moved by the regular AI.
 
-The game engine already did the geometry and arithmetic for you. Every option listed is legal right now:
-- "attack T from X,Y": the unit moves to X,Y if needed and attacks T. deal/take are expected damage (average luck).
-  "KILLS" means the target dies; a melee unit that kills moves into the target's tile. "WE DIE" means don't.
-- "move <kind> X,Y": tiles the unit can reach this turn. def = terrain defence bonus, "enemy dmg next turn" = damage
-  the visible enemies can deal to this unit there on their turn (if it is >= the unit's hp, the unit probably dies).
+The game engine already did the geometry and arithmetic for you. Every option listed is legal right now, and each
+has an id: <unit>.a<n> for an attack of that unit, <unit>.m<n> for a move. You give orders by these ids only.
+- "17.a1 attack T from X,Y": unit 17 moves to X,Y if needed and attacks T. deal/take are expected damage (average
+  luck). "KILLS" means the target dies; a melee unit that kills moves into the target's tile. "WE DIE" means don't.
+- "17.m2 move <kind> X,Y": a tile unit 17 can reach this turn. def = terrain defence bonus, "enemy dmg next turn" =
+  damage the visible enemies can deal to this unit there on their turn (if it is >= its hp, it probably dies).
+  The "stay" move with "then": "fortify" fortifies the unit where it stands.
+- Next to every enemy unit and city, "we can attack it with" lists the attack options that hit it. To finish a
+  wounded enemy, pick one of those. If it says "none of our units can attack it", nobody can this turn.
 - Units have 100 hp. Damage is applied in the order you give, so later options assume earlier attacks happened:
   options are computed for the start of the turn, so if an earlier attack already killed a target, attack something else.
 - Ranged and siege units do not take damage when attacking units. A unit that attacks usually cannot move afterwards.
+- Give each unit at most ONE order: an attack or a move, not both. A second order for the same unit is wasted.
+- An attack marked KILLS is expected to kill: send no other unit at that target, give them other targets or moves.
+  Send a second attacker only at a target that the first attack does NOT kill.
 - Usually: ranged units shoot first, melee units finish wounded targets, wounded units pull back to safe or
   defensive tiles, units adjacent to enemy melee should stand on good defence and fortify.
-- Use only unit ids, targets and tiles that appear in the battle description. Do not invent coordinates.
+- Only the listed option ids exist. A unit without an "a" option cannot attack this turn, even if enemies can hit it.
 - A tile holds one military unit, and options are listed per unit without regard to each other: never send two units
-  to the same tile. A second order for a tile that is already taken sends that unit to another tile of its own.
-- A unit can only make the attacks listed under that unit. An enemy being able to hit a unit does not mean the unit
-  can hit back. A unit with no attack listed must move, fortify or hold; an attack order for it is ignored.
+  to the same tile, and the "from" tile of an attack counts too. A second move to a tile that is already taken sends
+  that unit to another tile of its own; an attack whose "from" tile is taken may not happen at all.
 - Orders are carried out one by one with real dice. If something goes differently from the menu (an order fails,
-  a unit dies, a target survives a "KILLS" attack), execution stops and you get the new situation to re-plan.
+  a unit dies, a target survives a "KILLS" attack, a target dies to an attack without "KILLS"), execution stops
+  and you get the new situation to re-plan the units that can still act.
 
 Think about coordination: focus fire to kill units (a dead unit deals no damage next turn), protect ranged units,
 do not leave units on tiles where they will die for nothing, take cities when their hp is low.
@@ -37,16 +44,17 @@ Answer with ONE JSON object and nothing after it:
 {
   "intent": "short plan for this and the next turn, in $intentLanguage",
   "orders": [
-    {"unit": 17, "action": "attack", "target": 42, "why": "short reason for this attack, in $intentLanguage"},
-    {"unit": 23, "action": "attack", "target": "city@8,11", "from": "7,11", "why": "short reason, in $intentLanguage"},
-    {"unit": 9,  "action": "move", "tile": "7,12", "then": "fortify"},
-    {"unit": 31, "action": "move_toward", "tile": "6,10"},
-    {"unit": 12, "action": "fortify"}
+    {"option": "17.a1", "why": "short reason for this attack, in $intentLanguage"},
+    {"option": "23.a2", "why": "short reason, in $intentLanguage"},
+    {"option": "9.m3", "then": "fortify"},
+    {"option": "12.m1", "then": "fortify"},
+    {"unit": 31, "action": "move_toward", "tile": "6,10"}
   ],
   "production_hint": {"city": "city@3,4", "prefer": ["Archer", "Spearman"]}
 }
-Actions: attack (target = enemy unit id or city@x,y, optional "from" tile, "why" = a few words), move (tile reachable this turn,
-optional "then": "fortify"), move_toward (any tile, for reinforcements far away), fortify, hold.
+Orders run in the order you give them. Each one is an option id from the battle description: attacks with "why"
+(a few words), moves optionally with "then": "fortify". Units listed under Reinforcements have no options: send
+them with {"unit": <id>, "action": "move_toward", "tile": "x,y"} to any tile.
 production_hint is optional: units to build next in one of our cities (city@x,y) for this fight, from the lineup you are given.
 """.trimIndent()
 

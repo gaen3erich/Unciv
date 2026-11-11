@@ -27,7 +27,7 @@ data class CommanderConfig(
     /** Stop calling the model after this many calls in one run (0 = unlimited); later battles fall back to UnitTactics */
     val maxCalls: Int = 0,
     /** How many times per battle the model is asked again after a surprise during execution (a failed order, a lost unit, a kill that did not happen) */
-    val replans: Int = 2,
+    val replans: Int = 3,
     /** A request longer than this is not sent and its battle goes to the regular AI; protects a shared model server */
     val maxRequestChars: Int = 120_000,
     /** Language the model writes its intent in */

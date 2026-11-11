@@ -117,8 +117,7 @@ class StubCommanderModel : CommanderModel {
                 .maxByOrNull { (if (it.damageDealt >= (enemyHealth[it.targetRef] ?: 0)) 1000 else 0) + it.damageDealt - it.damageTaken }
             if (attack != null) {
                 enemyHealth[attack.targetRef] = (enemyHealth[attack.targetRef] ?: 0) - attack.damageDealt
-                val target = if (attack.targetRef.all { it.isDigit() }) attack.targetRef else jsonString(attack.targetRef)
-                orders += "{\"unit\": ${u.unit.id}, \"action\": \"attack\", \"target\": $target}"
+                orders += "{\"option\": \"${BattleDigestBuilder.attackId(u.unit, u.attacks.indexOf(attack))}\"}"
                 continue
             }
             // Units not in danger are left to the regular AI, which knows how to advance and besiege
@@ -127,7 +126,7 @@ class StubCommanderModel : CommanderModel {
                 .maxWithOrNull(compareBy<MoveOption> { -it.threat }.thenBy { it.defence })
             if (move != null && move.kind != "stay") {
                 usedTiles += move.tile.ref()
-                orders += "{\"unit\": ${u.unit.id}, \"action\": \"move\", \"tile\": \"${move.tile.ref()}\", \"then\": \"fortify\"}"
+                orders += "{\"option\": \"${BattleDigestBuilder.moveId(u.unit, u.moves.indexOf(move))}\", \"then\": \"fortify\"}"
             }
         }
         val json = "{\n  \"intent\": \"stub: kill what we can, trade well, endangered units step back\",\n  \"orders\": [\n    " +

@@ -91,6 +91,8 @@ object TacticalCommander {
                 newResults.forEach { logText.appendLine(it) }
                 if (replansLeft <= 0) break // the last plan has been carried out in full, whatever happened to it
                 val surprise = newResults.lastOrNull()?.surprise ?: break
+                // A lucky kill by the last order leaves no plan to revise
+                if (newResults.last().favourable && notRun.isEmpty()) break
                 val current = refresh(civ, engagement)
                 if (current.ownUnits.none { it.hasMovement() }) {
                     if (notRun.isNotEmpty()) logText.appendLine("(no unit can act any more, ${notRun.size} orders dropped)")
@@ -101,8 +103,8 @@ object TacticalCommander {
                 val situation = BattleDigestBuilder.build(civ, current)
                 executor.menu = situation
                 // Only the current situation and the latest orders: the request must not grow with every re-plan
+                // The plan itself is left out: repeating it made the model repeat the order that had just failed
                 val feedback = buildString {
-                    if (plan.intent.isNotBlank()) appendLine("Your plan: ${plan.intent}").appendLine()
                     appendLine("Your latest orders:")
                     newResults.forEachIndexed { i, r -> appendLine("${i + 1}. $r") }
                     appendLine()
@@ -110,7 +112,8 @@ object TacticalCommander {
                     appendLine("The situation now (units that already acted cannot attack or move any more):")
                     appendLine()
                     append(BattleDigestBuilder.render(situation))
-                    appendLine("Give new orders (same JSON format) for the units that can still act. Executed orders are done, do not repeat them.")
+                    appendLine("Give new orders (same JSON format) for the units that can still act, by the option ids above: " +
+                        "they are numbered anew. Executed orders are done, do not repeat them.")
                 }
                 logText.appendLine().appendLine("## Replan after a surprise").appendLine().appendLine("```").append(feedback).appendLine("```")
                 reply = ask(civ, listOf(CommanderMessage("system", system), CommanderMessage("user", feedback)), situation, logText, "Replanned answer", cfg)

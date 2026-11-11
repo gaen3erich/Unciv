@@ -161,7 +161,8 @@ class TacticalCommanderTests {
         assertTrue(log, us.experimentCounters.commanderCalls >= 1)
         assertEquals(0, us.experimentCounters.commanderModelErrors)
         assertTrue(log, log.contains("## Execution"))
-        assertTrue(log, log.contains("OK   #${archer.id} attack"))
+        // The stub answers by option ids, like the prompt asks the model to
+        assertTrue(log, log.contains("OK   #${archer.id} ${archer.id}.a"))
         assertTrue(File(logDir, "system-prompt.txt").exists())
         logDir.deleteRecursively()
     }
@@ -292,6 +293,38 @@ class TacticalCommanderTests {
     }
 
     @Test
+    fun attackFromATileAnEarlierOrderTookIsNotASurprise() {
+        val taken = archer.movement.getDistanceToTiles().keys.first { it != archer.getTile() && it.militaryUnit == null }
+        val offered = AttackOption("city@6,6", "City", taken, 10, 0, 100, 100, 0, true)
+        val executor = OrderExecutor(us, setOf(archer.id, warrior.id), menuWith(listOf(offered)))
+
+        val results = executor.execute(listOf(
+            CommanderOrder(archer.id, "move", tile = taken.ref()),
+            CommanderOrder(warrior.id, "attack", target = "city@6,6", from = taken.ref())))
+
+        assertTrue(results[0].toString(), results[0].ok)
+        assertFalse(results[1].ok)
+        assertEquals(results[1].toString(), null, results[1].surprise)
+        assertTrue(results[1].message, results[1].message.contains("taken by an earlier order"))
+    }
+
+    @Test
+    fun reinforcementThatCannotMoveIsNotASurprise() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val spearman = game.addUnit("Spearman", us, game.getTile(-4, -2))
+        spearman.currentMovement = 0f
+        us.cache.updateViewableTiles()
+        val model = ScriptedModel("""{"intent": "a", "orders": [{"unit": ${spearman.id}, "action": "move_toward", "tile": "1,0"},
+            {"unit": ${warrior.id}, "action": "fortify"}]}""")
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertEquals(1, model.asked.size)
+        assertTrue(warrior.isFortified())
+    }
+
+    @Test
     fun promptAsksForTheReasonOfAttacksAndTheParserAcceptsIt() {
         assertTrue(CommanderPrompt.systemPrompt("Russian").contains("\"why\""))
 
@@ -299,6 +332,141 @@ class TacticalCommanderTests {
 
         assertEquals(1, plan.orders.size)
         assertTrue(plan.warnings.isEmpty())
+    }
+
+    private fun realMenu() = BattleDigestBuilder.build(us, BattleDetector.detect(us).single())
+
+    @Test
+    fun menuNumbersEveryOptionAndShowsWhoCanHitEachEnemy() {
+        val digest = realMenu()
+        val text = BattleDigestBuilder.render(digest)
+        val archerMenu = digest.own.first { it.unit == archer }
+        val shot = archerMenu.attacks.indexOfFirst { it.targetRef == enemyWarrior.id.toString() }
+        assertTrue("the archer can shoot the wounded warrior", shot >= 0)
+
+        val id = BattleDigestBuilder.attackId(archer, shot)
+        assertTrue(text, text.contains("  $id attack ${enemyWarrior.id} "))
+        assertTrue(text, text.contains("  ${archer.id}.m1 move stay"))
+        val enemyLine = text.lines().first { it.startsWith("#${enemyWarrior.id} ") }
+        assertTrue(enemyLine, enemyLine.contains("we can attack it with: ") && enemyLine.contains(id))
+    }
+
+    @Test
+    fun parserReadsOptionIdsAndTheirUnit() {
+        val plan = CommanderPlanParser.parse("""{"orders": [{"option": "28.a1", "why": "x"}, {"unit": 5, "option": "#9.M2", "then": "Fortify"}]}""")
+
+        assertEquals(listOf(
+            CommanderOrder(28, "option", option = "28.a1"),
+            CommanderOrder(9, "option", then = "fortify", option = "9.m2"),
+        ), plan.orders)
+    }
+
+    @Test
+    fun attackOptionIsCarriedOut() {
+        val digest = realMenu()
+        val shot = digest.own.first { it.unit == archer }.attacks.indexOfFirst { it.targetRef == enemyWarrior.id.toString() }
+        val executor = OrderExecutor(us, setOf(archer.id), digest)
+
+        val result = executor.execute(listOf(CommanderOrder(archer.id, "option", option = BattleDigestBuilder.attackId(archer, shot)))).single()
+
+        assertTrue(result.toString(), result.ok)
+        assertEquals(1, archer.attacksThisTurn)
+    }
+
+    @Test
+    fun moveOptionWithFortifyIsCarriedOut() {
+        val digest = realMenu()
+        val moves = digest.own.first { it.unit == warrior }.moves
+        val executor = OrderExecutor(us, setOf(warrior.id), digest)
+
+        val result = executor.execute(listOf(CommanderOrder(warrior.id, "option", then = "fortify", option = "${warrior.id}.m1"))).single()
+
+        assertTrue(result.toString(), result.ok)
+        assertEquals(moves.first().tile, warrior.getTile())
+        assertTrue(warrior.isFortified())
+    }
+
+    @Test
+    fun unknownOptionNamesTheRealOnesAndIsNotASurprise() {
+        val executor = OrderExecutor(us, setOf(warrior.id), menuWith(emptyList()))
+
+        val result = executor.execute(listOf(CommanderOrder(warrior.id, "option", option = "${warrior.id}.a1"))).single()
+
+        assertFalse(result.ok)
+        assertEquals(null, result.surprise)
+        assertTrue(result.message, result.message.contains("this unit has: none"))
+    }
+
+    @Test
+    fun battleIsCommandedByOptionIds() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val digest = realMenu()
+        val shot = digest.own.first { it.unit == archer }.attacks.indexOfFirst { it.targetRef == enemyWarrior.id.toString() }
+        val model = ScriptedModel("""{"intent": "a", "orders": [{"option": "${BattleDigestBuilder.attackId(archer, shot)}", "why": "добиваем"},
+            {"option": "${warrior.id}.m1", "then": "fortify"}]}""")
+        TacticalCommander.modelOverride = model
+
+        val handled = TacticalCommander.commandBattles(us)
+
+        assertEquals(1, model.asked.size)
+        assertEquals(setOf(archer.id, warrior.id), handled)
+        assertEquals(1, archer.attacksThisTurn)
+    }
+
+    /** Answers [answers] in turn; before the first answer it leaves the wounded enemy warrior with [enemyHpAfterMenu] hp */
+    private inner class LuckModel(private val enemyHpAfterMenu: Int, vararg val answers: String) : CommanderModel {
+        override val name = "luck"
+        val asked = ArrayList<List<CommanderMessage>>()
+        override fun complete(messages: List<CommanderMessage>, digest: BattleDigest): CommanderReply {
+            if (asked.isEmpty()) enemyWarrior.health = enemyHpAfterMenu // the menu was built with more hp: no KILLS
+            asked += messages.toList()
+            return CommanderReply(answers[(asked.size - 1).coerceAtMost(answers.size - 1)])
+        }
+    }
+
+    private fun archerShotAtWoundedWarrior() =
+        """{"unit": ${archer.id}, "action": "attack", "target": ${enemyWarrior.id}}"""
+
+    @Test
+    fun aKillTheMenuDidNotExpectReplansBeforeTheNextOrder() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val model = LuckModel(1,
+            """{"intent": "a", "orders": [${archerShotAtWoundedWarrior()}, {"unit": ${warrior.id}, "action": "attack", "target": ${enemyWarrior.id}}]}""",
+            """{"intent": "b", "orders": [{"unit": ${warrior.id}, "action": "fortify"}]}""")
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertTrue(enemyWarrior.isDestroyed)
+        assertEquals(2, model.asked.size)
+        assertTrue(model.asked[1].last().content, model.asked[1].last().content.contains("the menu did not expect a kill"))
+        assertTrue("the planned second attack must not run", warrior.isFortified())
+    }
+
+    @Test
+    fun aLuckyKillByTheLastOrderDoesNotReplan() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val model = LuckModel(1, """{"intent": "a", "orders": [${archerShotAtWoundedWarrior()}]}""")
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertTrue(enemyWarrior.isDestroyed)
+        assertEquals(1, model.asked.size)
+    }
+
+    @Test
+    fun aSecondOrderForAUnitOutOfMovementIsNotASurprise() {
+        TacticalCommander.config = CommanderConfig(logDir = "", replans = 2)
+        val tile = archer.movement.getDistanceToTiles().keys.first { it != archer.getTile() && it.militaryUnit == null }
+        val model = ScriptedModel("""{"intent": "a", "orders": [${archerShotAtWoundedWarrior()},
+            {"unit": ${archer.id}, "action": "move", "tile": "${tile.position.x},${tile.position.y}"}]}""")
+        TacticalCommander.modelOverride = model
+
+        TacticalCommander.commandBattles(us)
+
+        assertEquals(1, archer.attacksThisTurn)
+        assertEquals(1, model.asked.size)
     }
 
     @Test

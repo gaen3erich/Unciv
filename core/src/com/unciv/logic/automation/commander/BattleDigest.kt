@@ -193,9 +193,27 @@ object BattleDigestBuilder {
         if (unit.baseUnit.isRanged()) "str ${unit.baseUnit.strength}/rng ${unit.baseUnit.rangedStrength} range ${unit.getRange()}"
         else "str ${unit.baseUnit.strength}"
 
+    /** Ids the model gives orders by: `<unit>.a<n>` for the n-th attack of the unit, `<unit>.m<n>` for its n-th move */
+    fun attackId(unit: MapUnit, index: Int) = "${unit.id}.a${index + 1}"
+    fun moveId(unit: MapUnit, index: Int) = "${unit.id}.m${index + 1}"
+    fun optionIds(own: OwnUnitDigest): List<String> =
+        own.attacks.indices.map { attackId(own.unit, it) } + own.moves.indices.map { moveId(own.unit, it) }
+
+    /** For every target, the attack options that hit it, so that a wounded enemy shows who can finish it */
+    private fun attackersByTarget(digest: BattleDigest): Map<String, List<String>> {
+        val result = LinkedHashMap<String, MutableList<String>>()
+        for (own in digest.own) for ((i, a) in own.attacks.withIndex())
+            result.getOrPut(a.targetRef) { ArrayList() } += attackId(own.unit, i) + if (a.kills) " KILLS" else ""
+        return result
+    }
+
+    private fun attackedBy(attackers: Map<String, List<String>>, targetRef: String): String =
+        attackers[targetRef]?.let { "; we can attack it with: " + it.joinToString() } ?: "; none of our units can attack it this turn"
+
     fun render(digest: BattleDigest): String = buildString {
         val engagement = digest.engagement
         val civ = digest.civ
+        val attackers = attackersByTarget(digest)
         appendLine("## Battle ${engagement.index} near ${engagement.centerTile().ref()} (turn ${civ.gameInfo.turns})")
         appendLine("Own units: ${engagement.ownUnits.size}, visible enemy units: ${engagement.enemyUnits.size}" +
             (if (engagement.isOwnCityThreatened) ", own city threatened: ${engagement.ownCities.joinToString { it.name }}" else ""))
@@ -204,7 +222,7 @@ object BattleDigestBuilder {
         if (engagement.ownCities.isNotEmpty() || engagement.enemyCities.isNotEmpty()) {
             appendLine("### Cities")
             for (city in engagement.ownCities) appendLine(cityLine(city, "OWN"))
-            for (city in engagement.enemyCities) appendLine(cityLine(city, "ENEMY ${city.civ.civName}"))
+            for (city in engagement.enemyCities) appendLine(cityLine(city, "ENEMY ${city.civ.civName}") + attackedBy(attackers, city.ref()))
             appendLine()
         }
 
@@ -219,17 +237,17 @@ object BattleDigestBuilder {
                 (if (!unit.canAttack() || !unit.hasMovement()) ", cannot attack this turn" else ""))
             if (u.attacks.isEmpty() && unit.canAttack() && unit.hasMovement())
                 appendLine("  no attack available: no target in range this turn, even after moving")
-            for (a in u.attacks) {
+            for ((i, a) in u.attacks.withIndex()) {
                 val outcome = when {
                     a.attackerDies -> "WE DIE"
                     a.kills -> "KILLS (${a.targetName} has ${a.targetHealth})"
                     else -> "target left with ${a.targetHealth - a.damageDealt}"
                 }
-                appendLine("  attack ${a.targetRef} (${a.targetName}) from ${a.fromTile.ref()}${if (a.needsMove) " (moves there)" else ""}: " +
+                appendLine("  ${attackId(unit, i)} attack ${a.targetRef} (${a.targetName}) from ${a.fromTile.ref()}${if (a.needsMove) " (moves there)" else ""}: " +
                     "deal ${a.damageDealt}, take ${a.damageTaken}, $outcome; enemy dmg on us next turn ${a.threatAfter}")
             }
-            for (m in u.moves) {
-                appendLine("  move ${m.kind} ${m.tile.ref()} ${m.tile.terrainLabel()}: def ${m.defence}%, enemy dmg next turn ${m.threat}, " +
+            for ((i, m) in u.moves.withIndex()) {
+                appendLine("  ${moveId(unit, i)} move ${m.kind} ${m.tile.ref()} ${m.tile.terrainLabel()}: def ${m.defence}%, enemy dmg next turn ${m.threat}, " +
                     "distance to nearest enemy ${m.distanceToEnemy}")
             }
         }
@@ -241,7 +259,8 @@ object BattleDigestBuilder {
             val unit = e.unit
             appendLine("#${unit.id} ${unit.civ.civName} ${unit.name} [${role(unit)}] hp ${unit.health}/100, ${strengthLabel(unit)}, " +
                 "at ${unit.getTile().ref()} ${unit.getTile().terrainLabel()} def ${unit.getTile().defencePercent(unit)}%" +
-                if (e.canHit.isEmpty()) ", cannot reach our units" else ", can hit: " + e.canHit.joinToString { "${it.first} for ${it.second}" })
+                (if (e.canHit.isEmpty()) ", cannot reach our units" else ", can hit: " + e.canHit.joinToString { "${it.first} for ${it.second}" }) +
+                attackedBy(attackers, unit.id.toString()))
         }
         appendLine()
 
