@@ -1,0 +1,6 @@
+id,kind,units,engagedCost,effect,effectAsA,effectAsB,controlA,controlB,controlReproducible
+s1-t106,City,11,1095,75.0,360,-210,-255,255,false
+s1-t54,City,9,446,57.5,59,56,56,-56,true
+s3-t130,City,6,655,605.0,-850,2060,1449,-1449,false
+s3-t55,City,8,310,-65.0,-75,-55,15,-15,true
+s5-t87,City,7,495,-90.0,105,-285,420,-420,true

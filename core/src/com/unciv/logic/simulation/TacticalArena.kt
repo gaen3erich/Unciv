@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /*
@@ -214,6 +215,9 @@ data class ArenaPositionResult(
 ) {
     val controlIsReproducible get() = control == controlReplay
 
+    /** Battles of the candidate that went to the default AI because the model failed (no connection, timeout, bad answer) */
+    val candidateModelErrors get() = candidateAsA.sideA.commanderModelErrors + candidateAsB.sideB.commanderModelErrors
+
     /** How much better the candidate did than the baseline on the same side of the same position */
     fun effectAsA(cityWeight: Int) = candidateAsA.sideA.score(cityWeight) - control.sideA.score(cityWeight)
     fun effectAsB(cityWeight: Int) = candidateAsB.sideB.score(cityWeight) - control.sideB.score(cityWeight)
@@ -236,12 +240,24 @@ data class ArenaConfig(
     /** Positions with more units than this are skipped: large battles cost the most model calls */
     val maxUnits: Int = Int.MAX_VALUE,
     val threads: Int = Runtime.getRuntime().availableProcessors(),
+    /**
+     * A position whose candidate lost more battles than this to model errors is left out: it measures the default AI,
+     * not the candidate. After [stopAfterDiscarded] such positions in a row the model is taken to be gone and the run stops.
+     */
+    val maxModelErrors: Int = 3,
+    val stopAfterDiscarded: Int = 2,
     val log: (String) -> Unit = ::println,
 )
 
 /** Plays saved positions out, see the comment at the top of this file. */
 class TacticalArena(private val config: ArenaConfig) {
     var crashedPositions = 0
+        private set
+    /** Left out because the model failed in them, see [ArenaConfig.maxModelErrors] */
+    var discardedPositions = 0
+        private set
+    /** Set when the model failed in [ArenaConfig.stopAfterDiscarded] positions in a row; the rest were not played */
+    var stoppedBecauseModelFailed = false
         private set
 
     /** @param onProgress called with all results so far after each position, so that an interrupted run loses nothing */
@@ -252,6 +268,8 @@ class TacticalArena(private val config: ArenaConfig) {
         if (positions.size < inSet.size) config.log("Skipping ${inSet.size - positions.size} positions with more than ${config.maxUnits} units")
         val done = AtomicInteger()
         val finished = ArrayList<ArenaPositionResult>()
+        val stop = AtomicBoolean(false)
+        val discardedInARow = AtomicInteger()
         config.log("Tactical arena: candidate '${config.candidate}' vs baseline '${config.baseline}', " +
             "${positions.size} positions (${config.set}), ${config.horizon} turns each, ${config.threads} threads")
         return runArenaJobs(positions, config.threads,
@@ -260,14 +278,26 @@ class TacticalArena(private val config: ArenaConfig) {
                 config.log("Position ${position.id} crashed: $ex")
             }
         ) { position ->
+            if (stop.get()) return@runArenaJobs null
             val result = playPosition(position, store.gameData(position))
+            if (result.candidateModelErrors > config.maxModelErrors) {
+                synchronized(this) { discardedPositions++ }
+                config.log("[${done.incrementAndGet()}/${positions.size}] ${position.id}: LEFT OUT, the model failed in " +
+                    "${result.candidateModelErrors} battles and the default AI played them")
+                if (discardedInARow.incrementAndGet() >= config.stopAfterDiscarded && !stop.getAndSet(true)) {
+                    stoppedBecauseModelFailed = true
+                    config.log("STOPPED: the model failed in ${config.stopAfterDiscarded} positions in a row; the rest are not played")
+                }
+                return@runArenaJobs null
+            }
+            discardedInARow.set(0)
             config.log("[${done.incrementAndGet()}/${positions.size}] ${position.id}: effect %.0f".format(result.effect(config.cityWeight)))
             synchronized(finished) {
                 finished += result
                 onProgress(finished.sortedBy { it.position.id })
             }
             result
-        }.sortedBy { it.position.id }
+        }.filterNotNull().sortedBy { it.position.id }
     }
 
     fun playPosition(position: ArenaPosition, gameData: String): ArenaPositionResult {
@@ -316,7 +346,7 @@ internal fun <T, R> runArenaJobs(jobs: List<T>, threads: Int, onError: (T, Excep
             while (true) {
                 val job = queue.poll() ?: break
                 try {
-                    results.add(action(job))
+                    action(job)?.let { results.add(it) } // null: the job chose to leave no result
                 } catch (ex: Exception) {
                     onError(job, ex)
                     ex.printStackTrace()

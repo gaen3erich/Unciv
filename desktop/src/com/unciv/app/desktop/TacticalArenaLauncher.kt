@@ -7,6 +7,7 @@ import com.unciv.logic.automation.commander.TacticalCommander
 import com.unciv.logic.simulation.ArenaCollectConfig
 import com.unciv.logic.simulation.ArenaConfig
 import com.unciv.logic.simulation.ArenaPositionCollector
+import com.unciv.logic.simulation.ArenaPositionResult
 import com.unciv.logic.simulation.ArenaPositionStore
 import com.unciv.logic.simulation.ArenaSet
 import com.unciv.logic.simulation.TacticalArena
@@ -131,11 +132,15 @@ LlmCommander is configured with UNCIV_COMMANDER_* environment variables, see doc
             File(outDir, "positions.csv").writeText(report.csv())
         }
         // Written after every position, so that an interrupted run keeps what it has played
-        val results = arena.run(store) { write(TacticalArenaReport(config, it, arena.crashedPositions)) }
-        val report = TacticalArenaReport(config, results, arena.crashedPositions)
+        fun report(results: List<ArenaPositionResult>) =
+            TacticalArenaReport(config, results, arena.crashedPositions, arena.discardedPositions, arena.stoppedBecauseModelFailed)
+        val results = arena.run(store) { write(report(it)) }
+        val report = report(results)
         write(report)
         println()
         println(report.markdown())
         println("Report written to ${outDir.path}")
+        // A run cut short by a lost model must not look like a finished one to scripts
+        if (arena.stoppedBecauseModelFailed) exitProcess(4)
     }
 }

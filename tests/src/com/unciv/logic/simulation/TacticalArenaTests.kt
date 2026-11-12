@@ -2,6 +2,13 @@ package com.unciv.logic.simulation
 
 import com.unciv.UncivGame
 import com.unciv.logic.automation.AiProfile
+import com.unciv.logic.automation.commander.BattleDigest
+import com.unciv.logic.automation.commander.CommanderConfig
+import com.unciv.logic.automation.commander.CommanderMessage
+import com.unciv.logic.automation.commander.CommanderModel
+import com.unciv.logic.automation.commander.CommanderModelException
+import com.unciv.logic.automation.commander.CommanderReply
+import com.unciv.logic.automation.commander.TacticalCommander
 import com.unciv.logic.civilization.Civilization
 import com.unciv.logic.files.UncivFiles
 import com.unciv.models.metadata.GameSettings
@@ -273,5 +280,31 @@ class TacticalArenaTests {
         assertEquals(listOf("s1-t1"), results.map { it.position.id })
         assertEquals(0, arena.crashedPositions)
         assertFalse(TacticalArenaReport(ArenaConfig(profile, profile, log = {}), results).markdown().isEmpty())
+    }
+
+    @Test
+    fun `positions the model failed in are left out and the run stops when the model is gone`() {
+        val field = battlefield()
+        val store = ArenaPositionStore(Files.createTempDirectory("arena").toFile())
+        val save = UncivFiles.gameInfoToString(field.testGame.gameInfo, forceZip = true)
+        for (id in listOf("s1-t1", "s2-t1", "s3-t1")) store.add(position(id), save)
+        TacticalCommander.config = CommanderConfig(logDir = "")
+        TacticalCommander.modelOverride = object : CommanderModel {
+            override val name = "gone"
+            override fun complete(messages: List<CommanderMessage>, digest: BattleDigest): CommanderReply =
+                throw CommanderModelException("Connection refused")
+        }
+        val log = ArrayList<String>()
+        val candidate = AiProfile.parse("default+UnitTactics+LlmCommander")
+        val arena = TacticalArena(ArenaConfig(candidate, profile, horizon = 3, threads = 1, maxModelErrors = 0, log = { log += it }))
+
+        val results = try { arena.run(store) } finally { TacticalCommander.modelOverride = null }
+
+        assertTrue("no position may count the default AI as the candidate", results.isEmpty())
+        assertEquals(2, arena.discardedPositions)
+        assertTrue(arena.stoppedBecauseModelFailed)
+        assertTrue(log.joinToString("\n"), log.none { it.contains("s3-t1") })
+        val report = TacticalArenaReport(ArenaConfig(candidate, profile, log = {}), results, 0, arena.discardedPositions, true).markdown()
+        assertTrue(report, report.contains("STOPPED EARLY"))
     }
 }

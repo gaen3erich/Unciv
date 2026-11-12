@@ -7,6 +7,8 @@ class TacticalArenaReport(
     private val config: ArenaConfig,
     private val results: List<ArenaPositionResult>,
     private val crashedPositions: Int = 0,
+    private val discardedPositions: Int = 0,
+    private val stoppedBecauseModelFailed: Boolean = false,
 ) {
     private val effects = results.map { it.effect(config.cityWeight) }
 
@@ -31,7 +33,9 @@ class TacticalArenaReport(
         appendLine("# Tactical arena: `${config.candidate}` vs `${config.baseline}`")
         appendLine()
         appendLine("- Positions: ${results.size} from ${results.map { it.position.seed }.distinct().size} games (${config.set})" +
-            if (crashedPositions > 0) ", $crashedPositions crashed and left out" else "")
+            (if (crashedPositions > 0) ", $crashedPositions crashed and left out" else "") +
+            (if (discardedPositions > 0) ", $discardedPositions left out because the model failed in them" else "") +
+            (if (stoppedBecauseModelFailed) ". STOPPED EARLY: the model stopped answering, the remaining positions were not played" else ""))
         appendLine("- Horizon: ${config.horizon} turns; a city is worth ${config.cityWeight} production")
         appendLine("- Effect of a position: candidate's score minus the baseline's score on the same side of it, averaged over both sides")
         appendLine("- Intervals: bootstrap over games, 95%")
@@ -48,7 +52,7 @@ class TacticalArenaReport(
         appendLine("| Controls that replayed identically | $reproducibleControls of ${results.size} |")
         val calls = results.sumOf { it.candidateAsA.sideA.commanderCalls + it.candidateAsB.sideB.commanderCalls }
         if (calls > 0) {
-            val errors = results.sumOf { it.candidateAsA.sideA.commanderModelErrors + it.candidateAsB.sideB.commanderModelErrors }
+            val errors = results.sumOf { it.candidateModelErrors }
             appendLine("| LLM commander calls / battles lost to model errors | $calls / $errors |")
         }
         if (reproducibleControls < results.size) {

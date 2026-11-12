@@ -1,0 +1,7 @@
+id,kind,units,engagedCost,effect,effectAsA,effectAsB,controlA,controlB,controlReproducible
+s34-t110,City,18,1600,322.5,-705,1350,1210,-1210,true
+s34-t62,City,9,415,-35.0,-35,-35,-75,75,true
+s35-t74,City,7,401,85.0,120,50,-134,134,true
+s35-t98,City,17,1395,-262.5,-975,450,945,-945,true
+s36-t107,City,9,765,22.5,-420,465,405,-405,true
+s36-t131,City,16,2330,352.5,-285,990,1515,-1515,true
